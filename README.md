@@ -81,8 +81,9 @@ For on-premise JIRA with Personal Access Token:
 | `JIRA_DEFAULT_PROJECT` | No | — | Default project key |
 | `JIRA_INSECURE` | No | `false` | Skip TLS verification |
 
-## Tools
+## Tools (25)
 
+### Issues
 | Tool | Description |
 |---|---|
 | `search_issues` | JQL search with field selection |
@@ -90,19 +91,66 @@ For on-premise JIRA with Personal Access Token:
 | `create_issue` | Create issues with markdown descriptions |
 | `update_issue` | Update issue fields |
 | `delete_issue` | Permanently delete an issue |
+
+### Workflow
+| Tool | Description |
+|---|---|
 | `list_transitions` | Available workflow transitions |
 | `transition_issue` | Move issue through workflow |
+
+### Comments
+| Tool | Description |
+|---|---|
 | `add_comment` | Add comment (markdown) |
 | `get_comments` | Get issue comments |
+
+### Epics
+| Tool | Description |
+|---|---|
+| `list_epics` | List epics for a board |
+| `get_epic` | Epic details with child issue breakdown, completion %, and assignee distribution |
+| `move_issues_to_epic` | Assign issues to an epic |
+
+### Issue Links
+| Tool | Description |
+|---|---|
+| `link_issues` | Create links between issues (Blocks, Duplicate, Relates, etc.) |
+| `get_issue_links` | Get all links for an issue — blockers, dependencies, duplicates |
+
+### Time Tracking
+| Tool | Description |
+|---|---|
+| `add_worklog` | Log time spent on an issue |
+| `get_worklogs` | Get worklogs with total time summary |
+
+### Watchers
+| Tool | Description |
+|---|---|
+| `add_watcher` | Add a user as watcher on an issue |
+| `get_watchers` | List watchers on an issue |
+
+### Projects, Boards, Sprints
+| Tool | Description |
+|---|---|
 | `list_projects` | List accessible projects |
 | `get_project` | Project details |
 | `list_boards` | List agile boards |
 | `list_sprints` | List sprints for a board |
 | `get_sprint_issues` | Issues in a sprint |
+
+### Users
+| Tool | Description |
+|---|---|
 | `search_users` | Find users by name/email |
 | `assign_issue` | Assign/unassign issue |
 
-## Resources
+### Versions & Components
+| Tool | Description |
+|---|---|
+| `list_versions` | List release versions for a project |
+| `list_components` | List components for a project |
+
+## Resources (4)
 
 | URI | Description |
 |---|---|
@@ -111,7 +159,7 @@ For on-premise JIRA with Personal Access Token:
 | `jira://myself` | Current authenticated user |
 | `jira://issue/{key}` | Single issue by key |
 
-## Prompts
+## Prompts (7)
 
 | Prompt | Description |
 |---|---|
@@ -119,6 +167,9 @@ For on-premise JIRA with Personal Access Token:
 | `bug-triage` | Bug prioritization recommendations |
 | `release-notes` | Generate release notes from JQL |
 | `standup-summary` | Daily standup talking points |
+| `epic-analysis` | Deep epic health analysis: completion %, blockers, stale issues, team load, timeline forecast |
+| `sprint-retrospective` | Post-sprint analysis: what shipped, what slipped, velocity by assignee, action items |
+| `workload-balance` | Team capacity analysis: overloaded members, unassigned work, rebalancing recommendations |
 
 ## Key Features
 

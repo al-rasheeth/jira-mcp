@@ -218,6 +218,117 @@ export interface AddCommentPayload {
   body: string | AdfDocument;
 }
 
+// ─── Epic (Agile) ───────────────────────────────────────────────────────────
+
+export interface JiraEpic {
+  id: number;
+  key: string;
+  self: string;
+  name: string;
+  summary: string;
+  done: boolean;
+}
+
+export interface JiraEpicsResponse {
+  maxResults: number;
+  startAt: number;
+  isLast: boolean;
+  values: JiraEpic[];
+}
+
+export interface JiraEpicIssuesResponse {
+  maxResults: number;
+  startAt: number;
+  total: number;
+  issues: JiraIssue[];
+}
+
+// ─── Issue Links ────────────────────────────────────────────────────────────
+
+export interface JiraIssueLinkType {
+  id: string;
+  name: string;
+  inward: string;
+  outward: string;
+}
+
+export interface JiraIssueLink {
+  id: string;
+  type: JiraIssueLinkType;
+  inwardIssue?: { key: string; fields?: { summary: string; status: JiraStatus } };
+  outwardIssue?: { key: string; fields?: { summary: string; status: JiraStatus } };
+}
+
+export interface LinkIssuesPayload {
+  type: { name: string };
+  inwardIssue: { key: string };
+  outwardIssue: { key: string };
+  comment?: { body: string | AdfDocument };
+}
+
+// ─── Worklog ────────────────────────────────────────────────────────────────
+
+export interface JiraWorklog {
+  id: string;
+  author: JiraUser;
+  started: string;
+  timeSpent: string;
+  timeSpentSeconds: number;
+  comment?: string | AdfDocument;
+  created: string;
+  updated: string;
+}
+
+export interface JiraWorklogsResponse {
+  worklogs: JiraWorklog[];
+  total: number;
+  maxResults: number;
+  startAt: number;
+}
+
+export interface AddWorklogPayload {
+  timeSpent?: string;
+  timeSpentSeconds?: number;
+  started?: string;
+  comment?: string | AdfDocument;
+}
+
+// ─── Watchers ───────────────────────────────────────────────────────────────
+
+export interface JiraWatchersResponse {
+  self: string;
+  isWatching: boolean;
+  watchCount: number;
+  watchers: JiraUser[];
+}
+
+// ─── Versions ───────────────────────────────────────────────────────────────
+
+export interface JiraVersion {
+  id: string;
+  name: string;
+  description?: string;
+  archived: boolean;
+  released: boolean;
+  startDate?: string;
+  releaseDate?: string;
+  projectId?: number;
+  overdue?: boolean;
+}
+
+// ─── Components ─────────────────────────────────────────────────────────────
+
+export interface JiraComponent {
+  id: string;
+  name: string;
+  description?: string;
+  lead?: JiraUser;
+  assigneeType?: string;
+  project?: string;
+  projectId?: number;
+  isAssigneeTypeValid?: boolean;
+}
+
 // ─── Error ──────────────────────────────────────────────────────────────────
 
 export interface JiraErrorResponse {

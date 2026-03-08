@@ -12,7 +12,13 @@ export type EntityType =
   | "sprint"
   | "user"
   | "transition"
-  | "comment";
+  | "comment"
+  | "epic"
+  | "worklog"
+  | "version"
+  | "component"
+  | "watcher"
+  | "link";
 
 const DEFAULT_TTLS: Record<EntityType, number> = {
   issue: 60,
@@ -23,6 +29,12 @@ const DEFAULT_TTLS: Record<EntityType, number> = {
   user: 300,
   transition: 120,
   comment: 60,
+  epic: 120,
+  worklog: 60,
+  version: 300,
+  component: 300,
+  watcher: 120,
+  link: 120,
 };
 
 export class JiraCache {
