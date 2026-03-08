@@ -22,20 +22,18 @@ export function registerSprintRetrospectivePrompt(server: McpServer): void {
     async ({ boardId, sprintId }) => {
       const client = getClient();
 
-      const sprint = await client.request<JiraSprint>(
-        `${client.agileBase}/sprint/${sprintId}`
-      );
+      const sprint = await client.call(
+        () => client.agile.sprint.getSprint({ sprintId })
+      ) as unknown as JiraSprint;
 
-      const issuesData = await client.request<JiraSprintIssuesResponse>(
-        `${client.agileBase}/sprint/${sprintId}/issue`,
-        {
-          query: {
-            maxResults: 100,
-            fields:
-              "summary,status,priority,assignee,issuetype,labels,project,resolution,created,updated",
-          },
-        }
-      );
+      const issuesData = await client.call(
+        () => client.agile.board.getBoardIssuesForSprint({
+          boardId,
+          sprintId,
+          fields: ['summary', 'status', 'priority', 'assignee', 'issuetype', 'labels', 'project', 'resolution', 'created', 'updated'],
+          maxResults: 100,
+        })
+      ) as unknown as JiraSprintIssuesResponse;
 
       const issues = issuesData.issues;
       const completed: JiraIssue[] = [];

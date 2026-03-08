@@ -180,7 +180,8 @@ For on-premise JIRA with Personal Access Token:
 - **Custom Field Mapping**: Define friendly names in config, use them in tools transparently
 - **Dual API Support**: Single codebase for Cloud (v3 + ADF) and Data Center (v2 + plain text)
 - **Rate Limit Intelligence**: Token bucket rate limiter with Retry-After header respect
-- **Proxy Support**: HTTP/HTTPS proxy via undici ProxyAgent
+- **jira.js SDK**: Built on the official community TypeScript SDK with full API coverage and non-deprecated endpoints
+- **Proxy Support**: HTTP/HTTPS proxy via Axios proxy configuration
 - **Tool Annotations**: MCP annotations (readOnly, destructive, idempotent) for informed client decisions
 
 ## Development

@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { getCache } from "../cache/cache.js";
 import type { JiraMyself } from "../client/types.js";
 
 export function registerMyselfResources(server: McpServer): void {
@@ -13,10 +14,18 @@ export function registerMyselfResources(server: McpServer): void {
     },
     async (uri) => {
       const client = getClient();
-      const me = await client.request<JiraMyself>(
-        `${client.apiBase}/myself`,
-        { cacheable: "user" }
-      );
+      const cache = {
+        key: getCache().buildKey("user", "myself"),
+        entity: "user" as const,
+      };
+
+      const me = (await client.call(
+        () =>
+          client.isCloud
+            ? client.v3.myself.getCurrentUser()
+            : client.v2.myself.getCurrentUser(),
+        cache
+      )) as unknown as JiraMyself;
 
       const lines = [
         "# Current JIRA User",

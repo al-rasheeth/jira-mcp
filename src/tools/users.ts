@@ -19,15 +19,13 @@ export function registerUserTools(server: McpServer): void {
     },
     async ({ query, maxResults }) => {
       const client = getClient();
-      const users = await client.request<JiraUser[]>(
-        `${client.apiBase}/user/search`,
-        {
-          query: client.isCloud
-            ? { query, maxResults }
-            : { username: query, maxResults },
-          cacheable: "user",
-        }
-      );
+      const cache = getCache();
+      const users = await client.call(
+        () => client.isCloud
+          ? client.v3.userSearch.findUsers({ query, maxResults })
+          : client.v2.userSearch.findUsers({ username: query, maxResults }),
+        { key: cache.buildKey("user", query, String(maxResults)), entity: "user" }
+      ) as unknown as JiraUser[];
 
       if (users.length === 0) {
         return {
@@ -82,9 +80,9 @@ export function registerUserTools(server: McpServer): void {
         ? { accountId: assigneeId }
         : { name: assigneeId };
 
-      await client.request<void>(
-        `${client.apiBase}/issue/${issueKey}/assignee`,
-        { method: "PUT", body }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await client.call(() =>
+        client.v3.issues.assignIssue({ issueIdOrKey: issueKey, ...body } as any)
       );
 
       getCache().invalidateIssue(issueKey);

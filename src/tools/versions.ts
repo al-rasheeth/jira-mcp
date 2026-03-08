@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { getCache } from "../cache/cache.js";
 import type {
   JiraVersion,
   JiraComponent,
@@ -20,10 +21,15 @@ export function registerVersionAndComponentTools(server: McpServer): void {
     },
     async ({ projectKey }) => {
       const client = getClient();
-      const versions = await client.request<JiraVersion[]>(
-        `${client.apiBase}/project/${projectKey}/versions`,
-        { cacheable: "version" }
-      );
+      const cache = getCache();
+      const raw = await client.call(
+        () => client.isCloud
+          ? client.v3.projectVersions.getProjectVersionsPaginated({ projectIdOrKey: projectKey, maxResults: 200 })
+          : client.v2.projectVersions.getProjectVersionsPaginated({ projectIdOrKey: projectKey, maxResults: 200 }),
+        { key: cache.buildKey("version", projectKey), entity: "version" }
+      ) as unknown as { values: JiraVersion[] };
+
+      const versions = raw.values ?? [];
 
       if (versions.length === 0) {
         return {
@@ -76,10 +82,15 @@ export function registerVersionAndComponentTools(server: McpServer): void {
     },
     async ({ projectKey }) => {
       const client = getClient();
-      const components = await client.request<JiraComponent[]>(
-        `${client.apiBase}/project/${projectKey}/components`,
-        { cacheable: "component" }
-      );
+      const cache = getCache();
+      const raw = await client.call(
+        () => client.isCloud
+          ? client.v3.projectComponents.getProjectComponentsPaginated({ projectIdOrKey: projectKey, maxResults: 200 })
+          : client.v2.projectComponents.getProjectComponentsPaginated({ projectIdOrKey: projectKey, maxResults: 200 }),
+        { key: cache.buildKey("component", projectKey), entity: "component" }
+      ) as unknown as { values: JiraComponent[] };
+
+      const components = raw.values ?? [];
 
       if (components.length === 0) {
         return {

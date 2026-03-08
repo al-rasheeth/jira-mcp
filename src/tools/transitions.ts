@@ -22,10 +22,11 @@ export function registerTransitionTools(server: McpServer): void {
     },
     async ({ issueKey }) => {
       const client = getClient();
-      const data = await client.request<JiraTransitionsResponse>(
-        `${client.apiBase}/issue/${issueKey}/transitions`,
-        { cacheable: "transition" }
-      );
+      const cache = getCache();
+      const data = await client.call(
+        () => client.v3.issues.getTransitions({ issueIdOrKey: issueKey }),
+        { key: cache.buildKey("transition", issueKey), entity: "transition" }
+      ) as unknown as JiraTransitionsResponse;
 
       if (data.transitions.length === 0) {
         return {
@@ -78,32 +79,35 @@ export function registerTransitionTools(server: McpServer): void {
     },
     async ({ issueKey, transitionId, comment }) => {
       const client = getClient();
-      const payload: TransitionIssuePayload = {
-        transition: { id: transitionId },
-      };
 
-      if (comment) {
-        const body = client.isCloud
-          ? {
-              version: 1 as const,
-              type: "doc" as const,
-              content: [
-                {
-                  type: "paragraph",
-                  content: [{ type: "text", text: comment }],
-                },
-              ],
-            }
-          : comment;
+      const update = comment
+        ? {
+            comment: [{
+              add: {
+                body: client.isCloud
+                  ? {
+                      version: 1 as const,
+                      type: "doc" as const,
+                      content: [
+                        {
+                          type: "paragraph",
+                          content: [{ type: "text", text: comment }],
+                        },
+                      ],
+                    }
+                  : comment,
+              },
+            }],
+          }
+        : undefined;
 
-        payload.update = {
-          comment: [{ add: { body } }],
-        };
-      }
-
-      await client.request<void>(
-        `${client.apiBase}/issue/${issueKey}/transitions`,
-        { method: "POST", body: payload }
+      await client.call(() =>
+        client.v3.issues.doTransition({
+          issueIdOrKey: issueKey,
+          transition: { id: transitionId },
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ...(update ? { update: update as any } : {}),
+        })
       );
 
       getCache().invalidateIssue(issueKey);

@@ -22,29 +22,23 @@ export function registerBugTriagePrompt(server: McpServer): void {
     async ({ jql, maxResults }) => {
       const client = getClient();
 
-      const data = await client.request<JiraSearchResponse>(
-        `${client.apiBase}/search`,
-        {
-          method: "POST",
-          body: {
-            jql,
-            maxResults,
-            fields: [
-              "summary",
-              "status",
-              "priority",
-              "assignee",
-              "reporter",
-              "created",
-              "updated",
-              "labels",
-              "description",
-              "project",
-              "components",
-            ],
-          },
-        }
-      );
+      const data = await client.search({
+        jql,
+        maxResults,
+        fields: [
+          "summary",
+          "status",
+          "priority",
+          "assignee",
+          "reporter",
+          "created",
+          "updated",
+          "labels",
+          "description",
+          "project",
+          "components",
+        ],
+      });
 
       const bugLines = data.issues
         .map((issue) => {

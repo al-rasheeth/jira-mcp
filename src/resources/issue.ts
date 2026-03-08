@@ -1,8 +1,28 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { getCache } from "../cache/cache.js";
 import { adfToMarkdown } from "../client/adf-converter.js";
 import type { JiraIssue } from "../client/types.js";
+
+const ISSUE_FIELDS = [
+  "summary",
+  "status",
+  "priority",
+  "assignee",
+  "reporter",
+  "issuetype",
+  "description",
+  "labels",
+  "comment",
+  "created",
+  "updated",
+  "resolution",
+  "fixVersions",
+  "components",
+  "project",
+  "parent",
+];
 
 export function registerIssueResources(server: McpServer): void {
   server.registerResource(
@@ -19,16 +39,12 @@ export function registerIssueResources(server: McpServer): void {
       const client = getClient();
       const key = issueKey as string;
 
-      const issue = await client.request<JiraIssue>(
-        `${client.apiBase}/issue/${key}`,
-        {
-          query: {
-            fields:
-              "summary,status,priority,assignee,reporter,issuetype,description,labels,comment,created,updated,resolution,fixVersions,components,project,parent",
-          },
-          cacheable: "issue",
-        }
-      );
+      const cache = {
+        key: getCache().buildKey("issue", key),
+        entity: "issue" as const,
+      };
+
+      const issue: JiraIssue = await client.getIssue(key, ISSUE_FIELDS, cache);
 
       const f = issue.fields;
       const desc =

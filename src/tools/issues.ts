@@ -121,20 +121,22 @@ export function registerIssueTools(server: McpServer): void {
         fields ??
         "summary,status,priority,assignee,issuetype,labels,project,reporter";
 
-      const data = await client.request<JiraSearchResponse>(
-        `${client.apiBase}/search`,
-        {
-          method: "POST",
-          body: { jql, maxResults, fields: fieldList.split(",").map((f) => f.trim()) },
-          cacheable: "search",
-        }
-      );
+      const data = await client.search({
+        jql,
+        fields: fieldList.split(",").map((f) => f.trim()),
+        maxResults,
+      });
+
+      let text = formatSearchResults(data.issues, data.total);
+      if (data.nextPageToken) {
+        text += "\n\n_More results available._";
+      }
 
       return {
         content: [
           {
             type: "text" as const,
-            text: formatSearchResults(data.issues, data.total),
+            text,
           },
         ],
       };
@@ -156,17 +158,12 @@ export function registerIssueTools(server: McpServer): void {
       },
     },
     async ({ issueKey }) => {
-      const client = getClient();
-      const issue = await client.request<JiraIssue>(
-        `${client.apiBase}/issue/${issueKey}`,
-        {
-          query: {
-            fields:
-              "summary,status,priority,assignee,reporter,issuetype,description,labels,comment,created,updated,resolution,fixVersions,components,project,parent,subtasks",
-          },
-          cacheable: "issue",
-        }
-      );
+      const issue = await getClient().getIssue(issueKey, [
+        "summary", "status", "priority", "assignee", "reporter",
+        "issuetype", "description", "labels", "comment", "created",
+        "updated", "resolution", "fixVersions", "components",
+        "project", "parent", "subtasks",
+      ]);
 
       return {
         content: [{ type: "text" as const, text: formatIssue(issue) }],
@@ -274,10 +271,13 @@ export function registerIssueTools(server: McpServer): void {
         Object.assign(payload.fields, resolved);
       }
 
-      const result = await client.request<JiraIssue>(
-        `${client.apiBase}/issue`,
-        { method: "POST", body: payload }
-      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await client.call(async () => {
+        const created = client.isCloud
+          ? await client.v3.issues.createIssue({ fields: payload.fields } as any)
+          : await client.v2.issues.createIssue({ fields: payload.fields } as any);
+        return created as unknown as { id: string; key: string; self: string };
+      });
 
       getCache().invalidateEntity("search");
 
@@ -285,7 +285,7 @@ export function registerIssueTools(server: McpServer): void {
         content: [
           {
             type: "text" as const,
-            text: `Issue **${result.key}** created successfully.\n\nURL: ${getConfig().baseUrl}/browse/${result.key}`,
+            text: `Issue **${result.key}** created successfully.\n\nURL: ${client.baseUrl}/browse/${result.key}`,
           },
         ],
       };
@@ -344,10 +344,8 @@ export function registerIssueTools(server: McpServer): void {
         Object.assign(fields, client.resolveCustomFields(customFields));
       }
 
-      const payload: UpdateIssuePayload = { fields };
-      await client.request<void>(
-        `${client.apiBase}/issue/${issueKey}`,
-        { method: "PUT", body: payload }
+      await client.call(() =>
+        client.v3.issues.editIssue({ issueIdOrKey: issueKey, fields })
       );
 
       getCache().invalidateIssue(issueKey);
@@ -382,13 +380,11 @@ export function registerIssueTools(server: McpServer): void {
       },
     },
     async ({ issueKey, deleteSubtasks }) => {
-      const client = getClient();
-      await client.request<void>(
-        `${client.apiBase}/issue/${issueKey}`,
-        {
-          method: "DELETE",
-          query: { deleteSubtasks },
-        }
+      await getClient().call(() =>
+        getClient().v3.issues.deleteIssue({
+          issueIdOrKey: issueKey,
+          deleteSubtasks,
+        })
       );
 
       getCache().invalidateIssue(issueKey);

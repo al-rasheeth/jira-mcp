@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { getCache } from "../cache/cache.js";
 import type {
   JiraBoard,
   JiraBoardsResponse,
@@ -31,17 +32,15 @@ export function registerSprintTools(server: McpServer): void {
     },
     async ({ projectKeyOrId, type, maxResults }) => {
       const client = getClient();
-      const data = await client.request<JiraBoardsResponse>(
-        `${client.agileBase}/board`,
-        {
-          query: {
-            projectKeyOrId,
-            type,
-            maxResults,
-          },
-          cacheable: "board",
-        }
-      );
+      const cache = getCache();
+      const data = await client.call(
+        () => client.agile.board.getAllBoards({
+          projectKeyOrId,
+          type,
+          maxResults,
+        }),
+        { key: cache.buildKey("board", "list", type ?? "", projectKeyOrId ?? "", String(maxResults)), entity: "board" }
+      ) as unknown as JiraBoardsResponse;
 
       if (data.values.length === 0) {
         return {
@@ -83,13 +82,11 @@ export function registerSprintTools(server: McpServer): void {
     },
     async ({ boardId, state }) => {
       const client = getClient();
-      const data = await client.request<JiraSprintsResponse>(
-        `${client.agileBase}/board/${boardId}/sprint`,
-        {
-          query: { state },
-          cacheable: "sprint",
-        }
-      );
+      const cache = getCache();
+      const data = await client.call(
+        () => client.agile.board.getAllSprints({ boardId, state }),
+        { key: cache.buildKey("sprint", String(boardId), state ?? ""), entity: "sprint" }
+      ) as unknown as JiraSprintsResponse;
 
       if (data.values.length === 0) {
         return {
@@ -131,17 +128,15 @@ export function registerSprintTools(server: McpServer): void {
     },
     async ({ sprintId, maxResults }) => {
       const client = getClient();
-      const data = await client.request<JiraSprintIssuesResponse>(
-        `${client.agileBase}/sprint/${sprintId}/issue`,
-        {
-          query: {
-            maxResults,
-            fields:
-              "summary,status,priority,assignee,issuetype,labels,project",
-          },
-          cacheable: "sprint",
-        }
-      );
+      const cache = getCache();
+      const data = await client.call(
+        () => client.agile.sprint.getIssuesForSprint({
+          sprintId,
+          fields: ["summary", "status", "priority", "assignee", "issuetype", "labels", "project"],
+          maxResults,
+        }),
+        { key: cache.buildKey("sprint", "issues", String(sprintId), String(maxResults)), entity: "sprint" }
+      ) as unknown as JiraSprintIssuesResponse;
 
       if (data.issues.length === 0) {
         return {

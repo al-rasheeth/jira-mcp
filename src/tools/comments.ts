@@ -27,13 +27,13 @@ export function registerCommentTools(server: McpServer): void {
     },
     async ({ issueKey, maxResults }) => {
       const client = getClient();
-      const data = await client.request<CommentsResponse>(
-        `${client.apiBase}/issue/${issueKey}/comment`,
-        {
-          query: { maxResults, orderBy: "-created" },
-          cacheable: "comment",
-        }
-      );
+      const cache = getCache();
+      const data = await client.call(
+        () => client.isCloud
+          ? client.v3.issueComments.getComments({ issueIdOrKey: issueKey, maxResults, orderBy: "created" })
+          : client.v2.issueComments.getComments({ issueIdOrKey: issueKey, maxResults, orderBy: "created" }),
+        { key: cache.buildKey("comment", issueKey, String(maxResults)), entity: "comment" }
+      ) as unknown as CommentsResponse;
 
       if (data.comments.length === 0) {
         return {
@@ -89,14 +89,12 @@ export function registerCommentTools(server: McpServer): void {
     },
     async ({ issueKey, body }) => {
       const client = getClient();
-      const payload: AddCommentPayload = {
-        body: client.isCloud ? markdownToAdf(body) : body,
-      };
+      const commentBody = client.isCloud ? markdownToAdf(body) : body;
 
-      const result = await client.request<JiraComment>(
-        `${client.apiBase}/issue/${issueKey}/comment`,
-        { method: "POST", body: payload }
-      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await client.call(() =>
+        client.v3.issueComments.addComment({ issueIdOrKey: issueKey, body: commentBody } as any)
+      ) as unknown as JiraComment;
 
       getCache().invalidateIssue(issueKey);
       getCache().invalidateEntity("comment");

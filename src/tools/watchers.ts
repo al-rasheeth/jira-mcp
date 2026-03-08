@@ -18,10 +18,13 @@ export function registerWatcherTools(server: McpServer): void {
     },
     async ({ issueKey }) => {
       const client = getClient();
-      const data = await client.request<JiraWatchersResponse>(
-        `${client.apiBase}/issue/${issueKey}/watchers`,
-        { cacheable: "watcher" }
-      );
+      const cache = getCache();
+      const data = await client.call(
+        () => client.isCloud
+          ? client.v3.issueWatchers.getIssueWatchers({ issueIdOrKey: issueKey })
+          : client.v2.issueWatchers.getIssueWatchers({ issueIdOrKey: issueKey }),
+        { key: cache.buildKey("watcher", issueKey), entity: "watcher" }
+      ) as unknown as JiraWatchersResponse;
 
       if (data.watchers.length === 0) {
         return {
@@ -71,13 +74,9 @@ export function registerWatcherTools(server: McpServer): void {
       },
     },
     async ({ issueKey, accountId }) => {
-      const client = getClient();
-      await client.request<void>(
-        `${client.apiBase}/issue/${issueKey}/watchers`,
-        {
-          method: "POST",
-          body: accountId,
-        }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await getClient().call(() =>
+        getClient().v3.issueWatchers.addWatcher({ issueIdOrKey: issueKey } as any)
       );
 
       getCache().invalidateEntity("watcher");

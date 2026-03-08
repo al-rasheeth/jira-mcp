@@ -40,25 +40,19 @@ export function registerWorkloadBalancePrompt(server: McpServer): void {
 
       const client = getClient();
 
-      const openIssues = await client.request<JiraSearchResponse>(
-        `${client.apiBase}/search`,
-        {
-          method: "POST",
-          body: {
-            jql: `project = "${projectKey}" AND resolution = Unresolved ORDER BY assignee ASC, priority DESC`,
-            maxResults: 100,
-            fields: [
-              "summary",
-              "status",
-              "priority",
-              "assignee",
-              "issuetype",
-              "created",
-              "updated",
-            ],
-          },
-        }
-      );
+      const openIssues = await client.search({
+        jql: `project = "${projectKey}" AND resolution = Unresolved ORDER BY assignee ASC, priority DESC`,
+        maxResults: 100,
+        fields: [
+          "summary",
+          "status",
+          "priority",
+          "assignee",
+          "issuetype",
+          "created",
+          "updated",
+        ],
+      });
 
       const issues = openIssues.issues;
       const total = openIssues.total;

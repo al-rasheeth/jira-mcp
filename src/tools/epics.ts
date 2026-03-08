@@ -29,13 +29,11 @@ export function registerEpicTools(server: McpServer): void {
     },
     async ({ boardId, done, maxResults }) => {
       const client = getClient();
-      const data = await client.request<JiraEpicsResponse>(
-        `${client.agileBase}/board/${boardId}/epic`,
-        {
-          query: { maxResults, done },
-          cacheable: "epic",
-        }
-      );
+      const cache = getCache();
+      const data = await client.call(
+        () => client.agile.board.getEpics({ boardId, maxResults, done: done !== undefined ? String(done) : undefined }),
+        { key: cache.buildKey("epic", "list", String(boardId), String(done ?? ""), String(maxResults)), entity: "epic" }
+      ) as unknown as JiraEpicsResponse;
 
       if (data.values.length === 0) {
         return {
@@ -82,28 +80,23 @@ export function registerEpicTools(server: McpServer): void {
     async ({ epicKey, maxResults }) => {
       const client = getClient();
 
-      const epicIssue = await client.request<JiraIssue>(
-        `${client.apiBase}/issue/${epicKey}`,
-        {
-          query: {
-            fields:
-              "summary,status,priority,assignee,description,labels,created,updated,project,fixVersions",
-          },
-          cacheable: "epic",
-        }
-      );
+      const epicIssue = await client.getIssue(epicKey, [
+        "summary", "status", "priority", "assignee", "description",
+        "labels", "created", "updated", "project", "fixVersions",
+      ]);
 
-      const childData = await client.request<JiraEpicIssuesResponse>(
-        `${client.agileBase}/epic/${epicKey}/issue`,
-        {
-          query: {
-            maxResults,
-            fields:
-              "summary,status,priority,assignee,issuetype,labels,created,updated",
-          },
-          cacheable: "epic",
-        }
-      );
+      const childJql = client.isCloud
+        ? `parent = ${epicKey} ORDER BY rank ASC`
+        : `"Epic Link" = ${epicKey} ORDER BY rank ASC`;
+
+      const childData = await client.search({
+        jql: childJql,
+        fields: [
+          "summary", "status", "priority", "assignee",
+          "issuetype", "labels", "created", "updated",
+        ],
+        maxResults,
+      });
 
       const issues = childData.issues;
       const total = childData.total;
@@ -196,12 +189,8 @@ export function registerEpicTools(server: McpServer): void {
     },
     async ({ epicKey, issueKeys }) => {
       const client = getClient();
-      await client.request<void>(
-        `${client.agileBase}/epic/${epicKey}/issue`,
-        {
-          method: "POST",
-          body: { issues: issueKeys },
-        }
+      await client.call(() =>
+        client.agile.epic.moveIssuesToEpic({ epicIdOrKey: epicKey, issues: issueKeys })
       );
 
       getCache().invalidateEntity("epic");

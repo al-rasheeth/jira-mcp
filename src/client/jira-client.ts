@@ -1,7 +1,10 @@
-import { ProxyAgent } from "undici";
+import https from "node:https";
+import { Version2Client, Version3Client } from "jira.js";
+import { AgileClient } from "jira.js";
+import type { AxiosError } from "axios";
 import { getConfig, type Config } from "../config.js";
 import { getCache, type EntityType } from "../cache/cache.js";
-import type { JiraErrorResponse } from "./types.js";
+import type { JiraErrorResponse, JiraIssue, JiraSearchResponse } from "./types.js";
 
 export class JiraApiError extends Error {
   constructor(
@@ -22,15 +25,6 @@ export class JiraApiError extends Error {
   }
 }
 
-interface RequestOptions {
-  method?: string;
-  body?: unknown;
-  query?: Record<string, string | number | boolean | undefined>;
-  cacheable?: EntityType | false;
-  skipCache?: boolean;
-}
-
-// Token bucket for rate limiting
 class TokenBucket {
   private tokens: number;
   private lastRefill: number;
@@ -58,7 +52,10 @@ class TokenBucket {
   private refill(): void {
     const now = Date.now();
     const elapsed = (now - this.lastRefill) / 1000;
-    this.tokens = Math.min(this.maxTokens, this.tokens + elapsed * this.refillRate);
+    this.tokens = Math.min(
+      this.maxTokens,
+      this.tokens + elapsed * this.refillRate
+    );
     this.lastRefill = now;
   }
 }
@@ -67,79 +64,93 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function parseProxy(proxyUrl: string) {
+  const u = new URL(proxyUrl);
+  return {
+    protocol: u.protocol.replace(":", ""),
+    host: u.hostname,
+    port: parseInt(u.port, 10) || (u.protocol === "https:" ? 443 : 8080),
+    ...(u.username
+      ? {
+          auth: {
+            username: decodeURIComponent(u.username),
+            password: decodeURIComponent(u.password),
+          },
+        }
+      : {}),
+  };
+}
+
+interface CacheOpts {
+  key: string;
+  entity: EntityType;
+  skip?: boolean;
+}
+
 export class JiraClient {
   private config: Config;
-  private authHeader: string;
   private bucket: TokenBucket;
-  private dispatcher: ProxyAgent | undefined;
+
+  readonly v2: Version2Client;
+  readonly v3: Version3Client;
+  readonly agile: AgileClient;
+  readonly isCloud: boolean;
 
   constructor() {
     this.config = getConfig();
-
-    if (this.config.email) {
-      const encoded = Buffer.from(
-        `${this.config.email}:${this.config.apiToken}`
-      ).toString("base64");
-      this.authHeader = `Basic ${encoded}`;
-    } else {
-      this.authHeader = `Bearer ${this.config.apiToken}`;
-    }
-
+    this.isCloud = this.config.apiVersion === "3";
     this.bucket = new TokenBucket(
       this.config.rateLimit,
       this.config.rateLimit
     );
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const baseRequestConfig: Record<string, any> = {
+      timeout: this.config.requestTimeout,
+    };
+
     if (this.config.proxyUrl) {
-      this.dispatcher = new ProxyAgent({
-        uri: this.config.proxyUrl,
-        ...(this.config.insecure
-          ? { requestTls: { rejectUnauthorized: false } }
-          : {}),
+      baseRequestConfig.proxy = parseProxy(this.config.proxyUrl);
+    }
+
+    if (this.config.insecure) {
+      baseRequestConfig.httpsAgent = new https.Agent({
+        rejectUnauthorized: false,
       });
     }
-  }
 
-  private buildUrl(
-    path: string,
-    query?: Record<string, string | number | boolean | undefined>
-  ): string {
-    const base = this.config.baseUrl;
-    const url = new URL(path.startsWith("http") ? path : `${base}${path}`);
-    if (query) {
-      for (const [key, value] of Object.entries(query)) {
-        if (value !== undefined) {
-          url.searchParams.set(key, String(value));
+    const authentication = this.config.email
+      ? {
+          basic: {
+            email: this.config.email,
+            apiToken: this.config.apiToken,
+          },
         }
-      }
-    }
-    return url.toString();
+      : { oauth2: { accessToken: this.config.apiToken } };
+
+    const clientConfig = {
+      host: this.config.baseUrl,
+      authentication,
+      baseRequestConfig,
+    };
+
+    this.v3 = new Version3Client(clientConfig);
+    this.v2 = new Version2Client(clientConfig);
+    this.agile = new AgileClient(clientConfig);
   }
 
-  get apiBase(): string {
-    return `/rest/api/${this.config.apiVersion}`;
-  }
+  /**
+   * Rate-limited call with retry and optional caching.
+   * Wraps any jira.js client call.
+   */
+  async call<T>(
+    fn: () => Promise<T>,
+    cache?: CacheOpts
+  ): Promise<T> {
+    const cacheStore = getCache();
 
-  get agileBase(): string {
-    return "/rest/agile/1.0";
-  }
-
-  get isCloud(): boolean {
-    return this.config.apiVersion === "3";
-  }
-
-  async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-    const { method = "GET", body, query, cacheable, skipCache } = options;
-
-    const cache = getCache();
-    const url = this.buildUrl(path, query);
-    const cacheKey =
-      cacheable && method === "GET"
-        ? cache.buildKey(cacheable, url)
-        : undefined;
-
-    if (cacheKey && !skipCache) {
-      const cached = cache.get<T>(cacheKey);
+    if (cache && !cache.skip) {
+      const cached = cacheStore.get<T>(cache.key);
       if (cached !== undefined) return cached;
     }
 
@@ -152,122 +163,134 @@ export class JiraClient {
         await sleep(backoff);
       }
 
-      const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(),
-        this.config.requestTimeout
-      );
-
       try {
-        const fetchOptions: RequestInit & { dispatcher?: unknown } = {
-          method,
-          headers: {
-            Authorization: this.authHeader,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          signal: controller.signal,
-        };
+        const result = await fn();
 
-        if (body) {
-          fetchOptions.body = JSON.stringify(body);
+        if (cache) {
+          cacheStore.set(cache.key, result, cache.entity);
         }
 
-        if (this.dispatcher) {
-          fetchOptions.dispatcher = this.dispatcher;
-        }
-
-        const response = await fetch(url, fetchOptions);
-
-        if (response.status === 429) {
-          const retryAfter = response.headers.get("Retry-After");
-          const waitSec = retryAfter ? parseInt(retryAfter, 10) : 2 ** attempt;
-          await sleep(waitSec * 1000);
-          continue;
-        }
-
-        if (response.status >= 500 && attempt < this.config.maxRetries) {
-          lastError = new JiraApiError(
-            response.status,
-            response.statusText
-          );
-          continue;
-        }
-
-        if (!response.ok) {
-          let jiraErrors: JiraErrorResponse | undefined;
-          try {
-            jiraErrors = (await response.json()) as JiraErrorResponse;
-          } catch {
-            // response body not JSON
-          }
-          throw new JiraApiError(
-            response.status,
-            response.statusText,
-            jiraErrors
-          );
-        }
-
-        if (response.status === 204) {
-          return undefined as T;
-        }
-
-        const data = (await response.json()) as T;
-
-        if (cacheKey && cacheable) {
-          cache.set(cacheKey, data, cacheable);
-        }
-
-        return data;
+        return result;
       } catch (err) {
-        if (
-          err instanceof JiraApiError ||
-          (err instanceof DOMException && err.name === "AbortError")
-        ) {
-          throw err;
+        const axErr = err as AxiosError;
+        const status = axErr?.response?.status;
+
+        if (status === 429) {
+          const retryAfter = axErr.response?.headers?.["retry-after"];
+          const waitSec = retryAfter
+            ? parseInt(String(retryAfter), 10)
+            : 2 ** attempt;
+          await sleep(waitSec * 1000);
+          lastError = this.wrapError(axErr);
+          continue;
         }
-        lastError = err instanceof Error ? err : new Error(String(err));
-        if (attempt === this.config.maxRetries) break;
-      } finally {
-        clearTimeout(timeout);
+
+        if (status && status >= 500 && attempt < this.config.maxRetries) {
+          lastError = this.wrapError(axErr);
+          continue;
+        }
+
+        throw this.wrapError(axErr);
       }
     }
 
     throw lastError ?? new Error("Request failed after retries");
   }
 
+  private wrapError(err: AxiosError): JiraApiError | Error {
+    if (!err.response) return err instanceof Error ? err : new Error(String(err));
+    const data = err.response.data as JiraErrorResponse | undefined;
+    return new JiraApiError(
+      err.response.status,
+      err.response.statusText ?? "",
+      data
+    );
+  }
+
   /**
-   * Auto-paginate using startAt/maxResults pattern.
-   * `extract` pulls the items array from each page response.
+   * JQL search using the correct endpoint:
+   * - Cloud: enhanced search (POST /rest/api/3/search/jql) with nextPageToken
+   * - DC: legacy search (POST /rest/api/2/search) with startAt
    */
-  async paginate<TPage, TItem>(
-    path: string,
-    query: Record<string, string | number | boolean | undefined>,
-    extract: (page: TPage) => TItem[],
-    isLastPage: (page: TPage) => boolean,
-    maxPages = 10
-  ): Promise<TItem[]> {
-    const items: TItem[] = [];
-    let startAt = 0;
-    const maxResults = 50;
-
-    for (let page = 0; page < maxPages; page++) {
-      const pageData = await this.request<TPage>(path, {
-        query: { ...query, startAt, maxResults },
+  async searchJql(opts: {
+    jql: string;
+    fields?: string[];
+    maxResults?: number;
+    nextPageToken?: string;
+    startAt?: number;
+    expand?: string[];
+  }): Promise<JiraSearchResponse> {
+    if (this.isCloud) {
+      const raw = await this.v3.issueSearch.searchForIssuesUsingJqlEnhancedSearchPost({
+        jql: opts.jql,
+        fields: opts.fields,
+        maxResults: opts.maxResults ?? 50,
+        nextPageToken: opts.nextPageToken,
       });
-      const pageItems = extract(pageData);
-      items.push(...pageItems);
-
-      if (isLastPage(pageData) || pageItems.length === 0) break;
-      startAt += pageItems.length;
+      return {
+        issues: (raw.issues ?? []) as unknown as JiraIssue[],
+        total: (raw.issues ?? []).length,
+        maxResults: opts.maxResults ?? 50,
+        startAt: 0,
+        nextPageToken: raw.nextPageToken,
+      };
     }
 
-    return items;
+    const raw = await this.v2.issueSearch.searchForIssuesUsingJqlPost({
+      jql: opts.jql,
+      fields: opts.fields,
+      maxResults: opts.maxResults ?? 50,
+      startAt: opts.startAt ?? 0,
+    });
+    return {
+      issues: (raw.issues ?? []) as unknown as JiraIssue[],
+      total: raw.total ?? 0,
+      maxResults: raw.maxResults ?? 50,
+      startAt: raw.startAt ?? 0,
+    };
+  }
+
+  /**
+   * JQL search wrapped with rate limiting and caching.
+   */
+  async search(opts: {
+    jql: string;
+    fields?: string[];
+    maxResults?: number;
+    cache?: CacheOpts;
+  }): Promise<JiraSearchResponse> {
+    return this.call(
+      () => this.searchJql(opts),
+      opts.cache
+    );
+  }
+
+  /**
+   * Get a single issue by key with specified fields.
+   */
+  async getIssue(
+    issueKey: string,
+    fields?: string[],
+    cache?: CacheOpts
+  ): Promise<JiraIssue> {
+    const params = { issueIdOrKey: issueKey, fields };
+    return this.call(
+      async () => {
+        const raw = this.isCloud
+          ? await this.v3.issues.getIssue(params)
+          : await this.v2.issues.getIssue(params);
+        return raw as unknown as JiraIssue;
+      },
+      cache
+    );
+  }
+
+  get baseUrl(): string {
+    return this.config.baseUrl;
   }
 
   resolveCustomField(name: string): string {
-    const mapping = this.config.customFields;
-    return mapping[name] ?? name;
+    return this.config.customFields[name] ?? name;
   }
 
   resolveCustomFields(

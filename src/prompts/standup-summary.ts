@@ -47,25 +47,19 @@ export function registerStandupSummaryPrompt(server: McpServer): void {
 
       const client = getClient();
 
-      const recentlyUpdated = await client.request<JiraSearchResponse>(
-        `${client.apiBase}/search`,
-        {
-          method: "POST",
-          body: {
-            jql: `project = "${projectKey}" AND updated >= -${daysBack}d ORDER BY updated DESC`,
-            maxResults: 30,
-            fields: [
-              "summary",
-              "status",
-              "priority",
-              "assignee",
-              "issuetype",
-              "updated",
-              "resolution",
-            ],
-          },
-        }
-      );
+      const recentlyUpdated = await client.search({
+        jql: `project = "${projectKey}" AND updated >= -${daysBack}d ORDER BY updated DESC`,
+        maxResults: 30,
+        fields: [
+          "summary",
+          "status",
+          "priority",
+          "assignee",
+          "issuetype",
+          "updated",
+          "resolution",
+        ],
+      });
 
       const inProgress = recentlyUpdated.issues.filter(
         (i) => i.fields.status.statusCategory.key === "indeterminate"

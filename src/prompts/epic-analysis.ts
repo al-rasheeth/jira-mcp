@@ -20,40 +20,29 @@ export function registerEpicAnalysisPrompt(server: McpServer): void {
     async ({ epicKey }) => {
       const client = getClient();
 
-      const epicIssue = await client.request<JiraIssue>(
-        `${client.apiBase}/issue/${epicKey}`,
-        {
-          query: {
-            fields:
-              "summary,status,priority,assignee,description,labels,created,updated,project,fixVersions,components",
-          },
-        }
-      );
+      const epicIssue = await client.getIssue(epicKey, [
+        "summary", "status", "priority", "assignee", "description",
+        "labels", "created", "updated", "project", "fixVersions", "components",
+      ]);
 
-      const childData = await client.request<JiraSearchResponse>(
-        `${client.apiBase}/search`,
-        {
-          method: "POST",
-          body: {
-            jql: `"Epic Link" = "${epicKey}" OR parent = "${epicKey}" ORDER BY status ASC, priority DESC`,
-            maxResults: 100,
-            fields: [
-              "summary",
-              "status",
-              "priority",
-              "assignee",
-              "issuetype",
-              "labels",
-              "created",
-              "updated",
-              "resolution",
-              "issuelinks",
-              "fixVersions",
-              "components",
-            ],
-          },
-        }
-      );
+      const childData = await client.search({
+        jql: `"Epic Link" = "${epicKey}" OR parent = "${epicKey}" ORDER BY status ASC, priority DESC`,
+        maxResults: 100,
+        fields: [
+          "summary",
+          "status",
+          "priority",
+          "assignee",
+          "issuetype",
+          "labels",
+          "created",
+          "updated",
+          "resolution",
+          "issuelinks",
+          "fixVersions",
+          "components",
+        ],
+      });
 
       const issues = childData.issues;
       const total = childData.total;

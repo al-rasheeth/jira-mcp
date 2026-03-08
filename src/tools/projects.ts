@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { getCache } from "../cache/cache.js";
 import type { JiraProject } from "../client/types.js";
 
 function formatProject(p: JiraProject): string {
@@ -33,13 +34,15 @@ export function registerProjectTools(server: McpServer): void {
     },
     async ({ maxResults }) => {
       const client = getClient();
-      const projects = await client.request<JiraProject[]>(
-        `${client.apiBase}/project`,
-        {
-          query: { maxResults, expand: "lead" },
-          cacheable: "project",
-        }
-      );
+      const cache = getCache();
+      const raw = await client.call(async () => {
+        const result = client.isCloud
+          ? await client.v3.projects.searchProjects({ maxResults })
+          : await client.v2.projects.searchProjects({ maxResults });
+        return result as unknown as { values: JiraProject[] };
+      }, { key: cache.buildKey("project", "list", String(maxResults)), entity: "project" });
+
+      const projects = raw.values ?? [];
 
       if (projects.length === 0) {
         return {
@@ -77,10 +80,11 @@ export function registerProjectTools(server: McpServer): void {
     },
     async ({ projectKey }) => {
       const client = getClient();
-      const project = await client.request<JiraProject>(
-        `${client.apiBase}/project/${projectKey}`,
-        { cacheable: "project" }
-      );
+      const cache = getCache();
+      const project = await client.call(
+        () => client.v3.projects.getProject({ projectIdOrKey: projectKey }),
+        { key: cache.buildKey("project", projectKey), entity: "project" }
+      ) as unknown as JiraProject;
 
       return {
         content: [{ type: "text" as const, text: formatProject(project) }],

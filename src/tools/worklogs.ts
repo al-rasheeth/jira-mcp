@@ -24,13 +24,13 @@ export function registerWorklogTools(server: McpServer): void {
     },
     async ({ issueKey, maxResults }) => {
       const client = getClient();
-      const data = await client.request<JiraWorklogsResponse>(
-        `${client.apiBase}/issue/${issueKey}/worklog`,
-        {
-          query: { maxResults },
-          cacheable: "worklog",
-        }
-      );
+      const cache = getCache();
+      const data = await client.call(async () => {
+        const result = client.isCloud
+          ? await client.v3.issueWorklogs.getIssueWorklog({ issueIdOrKey: issueKey, maxResults })
+          : await client.v2.issueWorklogs.getIssueWorklog({ issueIdOrKey: issueKey, maxResults });
+        return result as unknown as JiraWorklogsResponse;
+      }, { key: cache.buildKey("worklog", issueKey, String(maxResults)), entity: "worklog" });
 
       if (data.worklogs.length === 0) {
         return {
@@ -103,14 +103,19 @@ export function registerWorklogTools(server: McpServer): void {
     },
     async ({ issueKey, timeSpent, started, comment }) => {
       const client = getClient();
-      const payload: AddWorklogPayload = { timeSpent };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const params: any = {
+        issueIdOrKey: issueKey,
+        timeSpent,
+      };
 
       if (started) {
-        payload.started = started;
+        params.started = started;
       }
 
       if (comment) {
-        payload.comment = client.isCloud
+        params.comment = client.isCloud
           ? {
               version: 1 as const,
               type: "doc" as const,
@@ -124,10 +129,9 @@ export function registerWorklogTools(server: McpServer): void {
           : comment;
       }
 
-      const result = await client.request<JiraWorklog>(
-        `${client.apiBase}/issue/${issueKey}/worklog`,
-        { method: "POST", body: payload }
-      );
+      const result = await client.call(() =>
+        client.v3.issueWorklogs.addWorklog(params)
+      ) as unknown as JiraWorklog;
 
       getCache().invalidateEntity("worklog");
 

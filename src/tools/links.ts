@@ -22,13 +22,11 @@ export function registerLinkTools(server: McpServer): void {
       annotations: { readOnlyHint: true },
     },
     async ({ issueKey }) => {
-      const client = getClient();
-      const issue = await client.request<JiraIssue>(
-        `${client.apiBase}/issue/${issueKey}`,
-        {
-          query: { fields: "issuelinks,summary" },
-          cacheable: "link",
-        }
+      const cache = getCache();
+      const issue = await getClient().getIssue(
+        issueKey,
+        ["issuelinks", "summary"],
+        { key: cache.buildKey("link", issueKey), entity: "link" }
       );
 
       const links = (issue.fields.issuelinks ?? []) as JiraIssueLink[];
@@ -94,17 +92,13 @@ export function registerLinkTools(server: McpServer): void {
       },
     },
     async ({ linkType, inwardIssueKey, outwardIssueKey }) => {
-      const client = getClient();
-      const payload: LinkIssuesPayload = {
-        type: { name: linkType },
-        inwardIssue: { key: inwardIssueKey },
-        outwardIssue: { key: outwardIssueKey },
-      };
-
-      await client.request<void>(`${client.apiBase}/issueLink`, {
-        method: "POST",
-        body: payload,
-      });
+      await getClient().call(() =>
+        getClient().v3.issueLinks.linkIssues({
+          type: { name: linkType },
+          inwardIssue: { key: inwardIssueKey },
+          outwardIssue: { key: outwardIssueKey },
+        })
+      );
 
       getCache().invalidateIssue(inwardIssueKey);
       getCache().invalidateIssue(outwardIssueKey);

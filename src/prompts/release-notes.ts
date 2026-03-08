@@ -22,26 +22,20 @@ export function registerReleaseNotesPrompt(server: McpServer): void {
     async ({ jql, version }) => {
       const client = getClient();
 
-      const data = await client.request<JiraSearchResponse>(
-        `${client.apiBase}/search`,
-        {
-          method: "POST",
-          body: {
-            jql,
-            maxResults: 100,
-            fields: [
-              "summary",
-              "issuetype",
-              "priority",
-              "status",
-              "labels",
-              "components",
-              "fixVersions",
-              "resolution",
-            ],
-          },
-        }
-      );
+      const data = await client.search({
+        jql,
+        maxResults: 100,
+        fields: [
+          "summary",
+          "issuetype",
+          "priority",
+          "status",
+          "labels",
+          "components",
+          "fixVersions",
+          "resolution",
+        ],
+      });
 
       const issuesByType: Record<string, string[]> = {};
       for (const issue of data.issues) {
