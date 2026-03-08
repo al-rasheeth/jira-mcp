@@ -105,8 +105,12 @@ export function registerEpicDevPlanPrompt(server: McpServer): void {
         "labels", "created", "updated", "project", "fixVersions", "components",
       ]);
 
+      const childJql = client.isCloud
+        ? `parent = "${epicKey}" ORDER BY priority DESC, status ASC`
+        : `"Epic Link" = "${epicKey}" ORDER BY priority DESC, status ASC`;
+
       const childData = await client.search({
-        jql: `"Epic Link" = "${epicKey}" OR parent = "${epicKey}" ORDER BY priority DESC, status ASC`,
+        jql: childJql,
         maxResults: 100,
         fields: [
           "summary",

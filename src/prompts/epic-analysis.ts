@@ -25,8 +25,12 @@ export function registerEpicAnalysisPrompt(server: McpServer): void {
         "labels", "created", "updated", "project", "fixVersions", "components",
       ]);
 
+      const childJql = client.isCloud
+        ? `parent = "${epicKey}" ORDER BY status ASC, priority DESC`
+        : `"Epic Link" = "${epicKey}" ORDER BY status ASC, priority DESC`;
+
       const childData = await client.search({
-        jql: `"Epic Link" = "${epicKey}" OR parent = "${epicKey}" ORDER BY status ASC, priority DESC`,
+        jql: childJql,
         maxResults: 100,
         fields: [
           "summary",

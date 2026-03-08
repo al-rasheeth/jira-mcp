@@ -82,7 +82,7 @@ For on-premise JIRA with Personal Access Token:
 | `JIRA_WRITE_ENABLED` | No | `false` | Set to `"true"` to enable write tools (create, update, delete, etc.) |
 | `JIRA_INSECURE` | No | `false` | Skip TLS verification |
 
-## Tools (25)
+## Tools (27)
 
 ### Issues
 | Tool | Description |
