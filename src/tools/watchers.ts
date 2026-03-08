@@ -20,9 +20,7 @@ export function registerWatcherTools(server: McpServer): void {
       const client = getClient();
       const cache = getCache();
       const data = await client.call(
-        () => client.isCloud
-          ? client.v3.issueWatchers.getIssueWatchers({ issueIdOrKey: issueKey })
-          : client.v2.issueWatchers.getIssueWatchers({ issueIdOrKey: issueKey }),
+        () => client.api.issueWatchers.getIssueWatchers({ issueIdOrKey: issueKey }),
         { key: cache.buildKey("watcher", issueKey), entity: "watcher" }
       ) as unknown as JiraWatchersResponse;
 
@@ -74,10 +72,10 @@ export function registerWatcherTools(server: McpServer): void {
       },
     },
     async ({ issueKey, accountId }) => {
+      const client = getClient();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await getClient().call(() =>
-        getClient().v3.issueWatchers.addWatcher({ issueIdOrKey: issueKey } as any)
-      );
+      const params = { issueIdOrKey: issueKey, accountId } as any;
+      await client.call(() => client.api.issueWatchers.addWatcher(params));
 
       getCache().invalidateEntity("watcher");
 

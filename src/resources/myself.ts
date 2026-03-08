@@ -20,10 +20,7 @@ export function registerMyselfResources(server: McpServer): void {
       };
 
       const me = (await client.call(
-        () =>
-          client.isCloud
-            ? client.v3.myself.getCurrentUser()
-            : client.v2.myself.getCurrentUser(),
+        () => client.api.myself.getCurrentUser(),
         cache
       )) as unknown as JiraMyself;
 

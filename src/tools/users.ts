@@ -20,10 +20,12 @@ export function registerUserTools(server: McpServer): void {
     async ({ query, maxResults }) => {
       const client = getClient();
       const cache = getCache();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const searchParams: any = client.isCloud
+        ? { query, maxResults }
+        : { username: query, maxResults };
       const users = await client.call(
-        () => client.isCloud
-          ? client.v3.userSearch.findUsers({ query, maxResults })
-          : client.v2.userSearch.findUsers({ username: query, maxResults }),
+        () => client.api.userSearch.findUsers(searchParams),
         { key: cache.buildKey("user", query, String(maxResults)), entity: "user" }
       ) as unknown as JiraUser[];
 
@@ -81,9 +83,8 @@ export function registerUserTools(server: McpServer): void {
         : { name: assigneeId };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await client.call(() =>
-        client.v3.issues.assignIssue({ issueIdOrKey: issueKey, ...body } as any)
-      );
+      const params = { issueIdOrKey: issueKey, ...body } as any;
+      await client.call(() => client.api.issues.assignIssue(params));
 
       getCache().invalidateIssue(issueKey);
 

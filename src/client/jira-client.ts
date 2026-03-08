@@ -91,10 +91,19 @@ export class JiraClient {
   private config: Config;
   private bucket: TokenBucket;
 
-  readonly v2: Version2Client;
-  readonly v3: Version3Client;
+  private readonly v2: Version2Client;
+  private readonly v3: Version3Client;
   readonly agile: AgileClient;
   readonly isCloud: boolean;
+
+  /**
+   * Platform-appropriate REST client (v3 for Cloud, v2 for Data Center).
+   * Typed as Version3Client since v2/v3 share the same method surface;
+   * the cast is safe because only the TypeScript generic return types differ.
+   */
+  get api(): Version3Client {
+    return (this.isCloud ? this.v3 : this.v2) as unknown as Version3Client;
+  }
 
   constructor() {
     this.config = getConfig();
@@ -212,7 +221,7 @@ export class JiraClient {
    * - Cloud: enhanced search (POST /rest/api/3/search/jql) with nextPageToken
    * - DC: legacy search (POST /rest/api/2/search) with startAt
    */
-  async searchJql(opts: {
+  private async searchJql(opts: {
     jql: string;
     fields?: string[];
     maxResults?: number;
@@ -273,12 +282,9 @@ export class JiraClient {
     fields?: string[],
     cache?: CacheOpts
   ): Promise<JiraIssue> {
-    const params = { issueIdOrKey: issueKey, fields };
     return this.call(
       async () => {
-        const raw = this.isCloud
-          ? await this.v3.issues.getIssue(params)
-          : await this.v2.issues.getIssue(params);
+        const raw = await this.api.issues.getIssue({ issueIdOrKey: issueKey, fields });
         return raw as unknown as JiraIssue;
       },
       cache

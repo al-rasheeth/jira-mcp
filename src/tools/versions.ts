@@ -23,9 +23,7 @@ export function registerVersionAndComponentTools(server: McpServer): void {
       const client = getClient();
       const cache = getCache();
       const raw = await client.call(
-        () => client.isCloud
-          ? client.v3.projectVersions.getProjectVersionsPaginated({ projectIdOrKey: projectKey, maxResults: 200 })
-          : client.v2.projectVersions.getProjectVersionsPaginated({ projectIdOrKey: projectKey, maxResults: 200 }),
+        () => client.api.projectVersions.getProjectVersionsPaginated({ projectIdOrKey: projectKey, maxResults: 200 }),
         { key: cache.buildKey("version", projectKey), entity: "version" }
       ) as unknown as { values: JiraVersion[] };
 
@@ -84,9 +82,7 @@ export function registerVersionAndComponentTools(server: McpServer): void {
       const client = getClient();
       const cache = getCache();
       const raw = await client.call(
-        () => client.isCloud
-          ? client.v3.projectComponents.getProjectComponentsPaginated({ projectIdOrKey: projectKey, maxResults: 200 })
-          : client.v2.projectComponents.getProjectComponentsPaginated({ projectIdOrKey: projectKey, maxResults: 200 }),
+        () => client.api.projectComponents.getProjectComponentsPaginated({ projectIdOrKey: projectKey, maxResults: 200 }),
         { key: cache.buildKey("component", projectKey), entity: "component" }
       ) as unknown as { values: JiraComponent[] };
 

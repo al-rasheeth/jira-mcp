@@ -29,9 +29,7 @@ export function registerCommentTools(server: McpServer): void {
       const client = getClient();
       const cache = getCache();
       const data = await client.call(
-        () => client.isCloud
-          ? client.v3.issueComments.getComments({ issueIdOrKey: issueKey, maxResults, orderBy: "created" })
-          : client.v2.issueComments.getComments({ issueIdOrKey: issueKey, maxResults, orderBy: "created" }),
+        () => client.api.issueComments.getComments({ issueIdOrKey: issueKey, maxResults, orderBy: "created" }),
         { key: cache.buildKey("comment", issueKey, String(maxResults)), entity: "comment" }
       ) as unknown as CommentsResponse;
 
@@ -92,8 +90,9 @@ export function registerCommentTools(server: McpServer): void {
       const commentBody = client.isCloud ? markdownToAdf(body) : body;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await client.call(() =>
-        client.v3.issueComments.addComment({ issueIdOrKey: issueKey, body: commentBody } as any)
+      const params = { issueIdOrKey: issueKey, body: commentBody } as any;
+      const result = await client.call(
+        () => client.api.issueComments.addComment(params)
       ) as unknown as JiraComment;
 
       getCache().invalidateIssue(issueKey);

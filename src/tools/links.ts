@@ -92,13 +92,13 @@ export function registerLinkTools(server: McpServer): void {
       },
     },
     async ({ linkType, inwardIssueKey, outwardIssueKey }) => {
-      await getClient().call(() =>
-        getClient().v3.issueLinks.linkIssues({
-          type: { name: linkType },
-          inwardIssue: { key: inwardIssueKey },
-          outwardIssue: { key: outwardIssueKey },
-        })
-      );
+      const client = getClient();
+      const params = {
+        type: { name: linkType },
+        inwardIssue: { key: inwardIssueKey },
+        outwardIssue: { key: outwardIssueKey },
+      };
+      await client.call(() => client.api.issueLinks.linkIssues(params));
 
       getCache().invalidateIssue(inwardIssueKey);
       getCache().invalidateIssue(outwardIssueKey);

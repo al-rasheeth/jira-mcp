@@ -24,7 +24,7 @@ export function registerTransitionTools(server: McpServer): void {
       const client = getClient();
       const cache = getCache();
       const data = await client.call(
-        () => client.v3.issues.getTransitions({ issueIdOrKey: issueKey }),
+        () => client.api.issues.getTransitions({ issueIdOrKey: issueKey }),
         { key: cache.buildKey("transition", issueKey), entity: "transition" }
       ) as unknown as JiraTransitionsResponse;
 
@@ -101,14 +101,13 @@ export function registerTransitionTools(server: McpServer): void {
           }
         : undefined;
 
-      await client.call(() =>
-        client.v3.issues.doTransition({
-          issueIdOrKey: issueKey,
-          transition: { id: transitionId },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ...(update ? { update: update as any } : {}),
-        })
-      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const params = {
+        issueIdOrKey: issueKey,
+        transition: { id: transitionId },
+        ...(update ? { update: update as any } : {}),
+      };
+      await client.call(() => client.api.issues.doTransition(params));
 
       getCache().invalidateIssue(issueKey);
       getCache().invalidateEntity("transition");

@@ -36,9 +36,7 @@ export function registerProjectTools(server: McpServer): void {
       const client = getClient();
       const cache = getCache();
       const raw = await client.call(async () => {
-        const result = client.isCloud
-          ? await client.v3.projects.searchProjects({ maxResults })
-          : await client.v2.projects.searchProjects({ maxResults });
+        const result = await client.api.projects.searchProjects({ maxResults });
         return result as unknown as { values: JiraProject[] };
       }, { key: cache.buildKey("project", "list", String(maxResults)), entity: "project" });
 
@@ -82,9 +80,12 @@ export function registerProjectTools(server: McpServer): void {
       const client = getClient();
       const cache = getCache();
       const project = await client.call(
-        () => client.v3.projects.getProject({ projectIdOrKey: projectKey }),
+        async () => {
+          const raw = await client.api.projects.getProject({ projectIdOrKey: projectKey });
+          return raw as unknown as JiraProject;
+        },
         { key: cache.buildKey("project", projectKey), entity: "project" }
-      ) as unknown as JiraProject;
+      );
 
       return {
         content: [{ type: "text" as const, text: formatProject(project) }],

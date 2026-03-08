@@ -272,12 +272,9 @@ export function registerIssueTools(server: McpServer): void {
       }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const result = await client.call(async () => {
-        const created = client.isCloud
-          ? await client.v3.issues.createIssue({ fields: payload.fields } as any)
-          : await client.v2.issues.createIssue({ fields: payload.fields } as any);
-        return created as unknown as { id: string; key: string; self: string };
-      });
+      const result = await client.call(
+        async () => await client.api.issues.createIssue({ fields: payload.fields } as any) as unknown as { id: string; key: string; self: string }
+      );
 
       getCache().invalidateEntity("search");
 
@@ -344,9 +341,7 @@ export function registerIssueTools(server: McpServer): void {
         Object.assign(fields, client.resolveCustomFields(customFields));
       }
 
-      await client.call(() =>
-        client.v3.issues.editIssue({ issueIdOrKey: issueKey, fields })
-      );
+      await client.call(() => client.api.issues.editIssue({ issueIdOrKey: issueKey, fields }));
 
       getCache().invalidateIssue(issueKey);
 
@@ -380,12 +375,8 @@ export function registerIssueTools(server: McpServer): void {
       },
     },
     async ({ issueKey, deleteSubtasks }) => {
-      await getClient().call(() =>
-        getClient().v3.issues.deleteIssue({
-          issueIdOrKey: issueKey,
-          deleteSubtasks,
-        })
-      );
+      const client = getClient();
+      await client.call(() => client.api.issues.deleteIssue({ issueIdOrKey: issueKey, deleteSubtasks }));
 
       getCache().invalidateIssue(issueKey);
 

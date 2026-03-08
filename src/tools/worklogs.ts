@@ -26,9 +26,7 @@ export function registerWorklogTools(server: McpServer): void {
       const client = getClient();
       const cache = getCache();
       const data = await client.call(async () => {
-        const result = client.isCloud
-          ? await client.v3.issueWorklogs.getIssueWorklog({ issueIdOrKey: issueKey, maxResults })
-          : await client.v2.issueWorklogs.getIssueWorklog({ issueIdOrKey: issueKey, maxResults });
+        const result = await client.api.issueWorklogs.getIssueWorklog({ issueIdOrKey: issueKey, maxResults });
         return result as unknown as JiraWorklogsResponse;
       }, { key: cache.buildKey("worklog", issueKey, String(maxResults)), entity: "worklog" });
 
@@ -129,9 +127,9 @@ export function registerWorklogTools(server: McpServer): void {
           : comment;
       }
 
-      const result = await client.call(() =>
-        client.v3.issueWorklogs.addWorklog(params)
-      ) as unknown as JiraWorklog;
+      const result = await client.call(
+        async () => await client.api.issueWorklogs.addWorklog(params) as unknown as JiraWorklog
+      );
 
       getCache().invalidateEntity("worklog");
 

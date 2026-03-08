@@ -20,14 +20,7 @@ export function registerProjectResources(server: McpServer): void {
       };
 
       const result = await client.call(
-        async () => {
-          if (client.isCloud) {
-            return await client.v3.projects.searchProjects({ maxResults: 200 });
-          }
-          return await client.v2.projects.searchProjects({ maxResults: 200 }) as unknown as Awaited<
-            ReturnType<typeof client.v3.projects.searchProjects>
-          >;
-        },
+        async () => await client.api.projects.searchProjects({ maxResults: 200 }),
         cache
       );
 
