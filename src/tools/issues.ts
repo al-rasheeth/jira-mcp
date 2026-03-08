@@ -174,6 +174,8 @@ export function registerIssueTools(server: McpServer): void {
     }
   );
 
+  if (!config.writeEnabled) return;
+
   server.registerTool(
     "create_issue",
     {

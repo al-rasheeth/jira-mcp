@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
+import { getConfig } from "../config.js";
 import type {
   JiraIssue,
   JiraIssueLink,
@@ -9,58 +10,6 @@ import type {
 } from "../client/types.js";
 
 export function registerLinkTools(server: McpServer): void {
-  server.registerTool(
-    "link_issues",
-    {
-      title: "Link Issues",
-      description:
-        'Create a link between two issues. Common link types: "Blocks" (inward blocks outward), "Duplicate", "Relates", "Cloners".',
-      inputSchema: z.object({
-        linkType: z
-          .string()
-          .describe(
-            'Link type name, e.g. "Blocks", "Duplicate", "Relates", "Cloners"'
-          ),
-        inwardIssueKey: z
-          .string()
-          .describe("Inward issue key (e.g. the blocking issue)"),
-        outwardIssueKey: z
-          .string()
-          .describe("Outward issue key (e.g. the blocked issue)"),
-      }),
-      annotations: {
-        destructiveHint: false,
-        idempotentHint: true,
-      },
-    },
-    async ({ linkType, inwardIssueKey, outwardIssueKey }) => {
-      const client = getClient();
-      const payload: LinkIssuesPayload = {
-        type: { name: linkType },
-        inwardIssue: { key: inwardIssueKey },
-        outwardIssue: { key: outwardIssueKey },
-      };
-
-      await client.request<void>(`${client.apiBase}/issueLink`, {
-        method: "POST",
-        body: payload,
-      });
-
-      getCache().invalidateIssue(inwardIssueKey);
-      getCache().invalidateIssue(outwardIssueKey);
-      getCache().invalidateEntity("link");
-
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Linked **${inwardIssueKey}** —[${linkType}]→ **${outwardIssueKey}**`,
-          },
-        ],
-      };
-    }
-  );
-
   server.registerTool(
     "get_issue_links",
     {
@@ -114,6 +63,60 @@ export function registerLinkTools(server: McpServer): void {
 
       return {
         content: [{ type: "text" as const, text: lines.join("\n") }],
+      };
+    }
+  );
+
+  if (!getConfig().writeEnabled) return;
+
+  server.registerTool(
+    "link_issues",
+    {
+      title: "Link Issues",
+      description:
+        'Create a link between two issues. Common link types: "Blocks" (inward blocks outward), "Duplicate", "Relates", "Cloners".',
+      inputSchema: z.object({
+        linkType: z
+          .string()
+          .describe(
+            'Link type name, e.g. "Blocks", "Duplicate", "Relates", "Cloners"'
+          ),
+        inwardIssueKey: z
+          .string()
+          .describe("Inward issue key (e.g. the blocking issue)"),
+        outwardIssueKey: z
+          .string()
+          .describe("Outward issue key (e.g. the blocked issue)"),
+      }),
+      annotations: {
+        destructiveHint: false,
+        idempotentHint: true,
+      },
+    },
+    async ({ linkType, inwardIssueKey, outwardIssueKey }) => {
+      const client = getClient();
+      const payload: LinkIssuesPayload = {
+        type: { name: linkType },
+        inwardIssue: { key: inwardIssueKey },
+        outwardIssue: { key: outwardIssueKey },
+      };
+
+      await client.request<void>(`${client.apiBase}/issueLink`, {
+        method: "POST",
+        body: payload,
+      });
+
+      getCache().invalidateIssue(inwardIssueKey);
+      getCache().invalidateIssue(outwardIssueKey);
+      getCache().invalidateEntity("link");
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Linked **${inwardIssueKey}** —[${linkType}]→ **${outwardIssueKey}**`,
+          },
+        ],
       };
     }
   );

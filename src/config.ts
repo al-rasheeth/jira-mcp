@@ -28,6 +28,10 @@ const configSchema = z.object({
       }
     }),
   defaultProject: z.string().optional(),
+  writeEnabled: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
   insecure: z
     .string()
     .optional()
@@ -59,6 +63,7 @@ export function loadConfig(): Config {
     rateLimit: process.env.JIRA_RATE_LIMIT,
     customFields: process.env.JIRA_CUSTOM_FIELDS,
     defaultProject: process.env.JIRA_DEFAULT_PROJECT,
+    writeEnabled: process.env.JIRA_WRITE_ENABLED,
     insecure: process.env.JIRA_INSECURE,
   };
 

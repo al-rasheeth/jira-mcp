@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
+import { getConfig } from "../config.js";
 import type {
   JiraTransitionsResponse,
   TransitionIssuePayload,
@@ -51,6 +52,8 @@ export function registerTransitionTools(server: McpServer): void {
       };
     }
   );
+
+  if (!getConfig().writeEnabled) return;
 
   server.registerTool(
     "transition_issue",

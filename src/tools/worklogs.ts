@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
+import { getConfig } from "../config.js";
 import { adfToMarkdown } from "../client/adf-converter.js";
 import type {
   JiraWorklog,
@@ -69,6 +70,8 @@ export function registerWorklogTools(server: McpServer): void {
       };
     }
   );
+
+  if (!getConfig().writeEnabled) return;
 
   server.registerTool(
     "add_worklog",

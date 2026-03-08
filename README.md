@@ -79,6 +79,7 @@ For on-premise JIRA with Personal Access Token:
 | `JIRA_RATE_LIMIT` | No | `10` | Max requests per second |
 | `JIRA_CUSTOM_FIELDS` | No | — | JSON map: `{"storyPoints": "customfield_10016"}` |
 | `JIRA_DEFAULT_PROJECT` | No | — | Default project key |
+| `JIRA_WRITE_ENABLED` | No | `false` | Set to `"true"` to enable write tools (create, update, delete, etc.) |
 | `JIRA_INSECURE` | No | `false` | Skip TLS verification |
 
 ## Tools (25)
