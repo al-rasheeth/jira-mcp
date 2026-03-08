@@ -76,8 +76,11 @@ export function registerSprintRetrospectivePrompt(server: McpServer): void {
       const assigneeStats = Object.entries(byAssignee)
         .sort(([, a], [, b]) => b.done + b.notDone - (a.done + a.notDone))
         .map(
-          ([name, stats]) =>
-            `- ${name}: ${stats.done} done, ${stats.notDone} not done (${Math.round((stats.done / (stats.done + stats.notDone)) * 100)}% rate)`
+          ([name, stats]) => {
+            const total = stats.done + stats.notDone;
+            const rate = total > 0 ? Math.round((stats.done / total) * 100) : 0;
+            return `- ${name}: ${stats.done} done, ${stats.notDone} not done (${rate}% rate)`;
+          }
         )
         .join("\n");
 

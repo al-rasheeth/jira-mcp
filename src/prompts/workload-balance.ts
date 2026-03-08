@@ -97,13 +97,11 @@ export function registerWorkloadBalancePrompt(server: McpServer): void {
         entry.byType[type] = (entry.byType[type] ?? 0) + 1;
       }
 
+      const assignedMemberCount = Object.keys(byAssignee).filter(
+        (n) => n !== "Unassigned"
+      ).length;
       const avgLoad =
-        Object.keys(byAssignee).length > 0
-          ? Math.round(
-              total /
-                Object.keys(byAssignee).filter((n) => n !== "Unassigned").length
-            )
-          : 0;
+        assignedMemberCount > 0 ? Math.round(total / assignedMemberCount) : 0;
 
       const memberDetails = Object.entries(byAssignee)
         .sort(([, a], [, b]) => b.issues.length - a.issues.length)

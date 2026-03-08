@@ -160,7 +160,7 @@ For on-premise JIRA with Personal Access Token:
 | `jira://myself` | Current authenticated user |
 | `jira://issue/{key}` | Single issue by key |
 
-## Prompts (7)
+## Prompts (8)
 
 | Prompt | Description |
 |---|---|
@@ -169,6 +169,7 @@ For on-premise JIRA with Personal Access Token:
 | `release-notes` | Generate release notes from JQL |
 | `standup-summary` | Daily standup talking points |
 | `epic-analysis` | Deep epic health analysis: completion %, blockers, stale issues, team load, timeline forecast |
+| `epic-dev-plan` | Platform-specific development plan from an epic — filters tickets by platform (web/api/mobile/etc.), extracts Figma links, generates implementation roadmap with architecture and per-ticket notes |
 | `sprint-retrospective` | Post-sprint analysis: what shipped, what slipped, velocity by assignee, action items |
 | `workload-balance` | Team capacity analysis: overloaded members, unassigned work, rebalancing recommendations |
 

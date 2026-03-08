@@ -62,7 +62,7 @@ function formatIssue(issue: JiraIssue): string {
           ? adfToMarkdown(c.body)
           : (c.body as string);
       lines.push(
-        `**${c.author.displayName}** (${c.created}):`,
+        `**${c.author?.displayName ?? "Unknown"}** (${c.created}):`,
         body.trim(),
         ""
       );

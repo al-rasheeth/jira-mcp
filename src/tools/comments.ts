@@ -58,7 +58,7 @@ export function registerCommentTools(server: McpServer): void {
             : (c.body as string);
         lines.push(
           `---`,
-          `**${c.author.displayName}** — ${c.created}`,
+          `**${c.author?.displayName ?? "Unknown"}** — ${c.created}`,
           "",
           body.trim(),
           ""

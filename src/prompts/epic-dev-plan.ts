@@ -68,7 +68,7 @@ function formatIssueDeep(
       const body = convertBody(c.body, isCloud);
       figmaUrls.push(...extractFigmaUrls(body));
       lines.push(
-        `> **${c.author.displayName}** (${c.created.split("T")[0]}): ${body.trim().slice(0, 500)}`,
+        `> **${c.author?.displayName ?? "Unknown"}** (${c.created.split("T")[0]}): ${body.trim().slice(0, 500)}`,
         ""
       );
     }

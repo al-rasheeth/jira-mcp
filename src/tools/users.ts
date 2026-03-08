@@ -19,14 +19,15 @@ export function registerUserTools(server: McpServer): void {
     },
     async ({ query, maxResults }) => {
       const client = getClient();
-      const endpoint = client.isCloud
-        ? `${client.apiBase}/user/search`
-        : `${client.apiBase}/user/search`;
-
-      const users = await client.request<JiraUser[]>(endpoint, {
-        query: { query, maxResults },
-        cacheable: "user",
-      });
+      const users = await client.request<JiraUser[]>(
+        `${client.apiBase}/user/search`,
+        {
+          query: client.isCloud
+            ? { query, maxResults }
+            : { username: query, maxResults },
+          cacheable: "user",
+        }
+      );
 
       if (users.length === 0) {
         return {

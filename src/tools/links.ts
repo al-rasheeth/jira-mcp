@@ -90,7 +90,7 @@ export function registerLinkTools(server: McpServer): void {
       }),
       annotations: {
         destructiveHint: false,
-        idempotentHint: true,
+        idempotentHint: false,
       },
     },
     async ({ linkType, inwardIssueKey, outwardIssueKey }) => {

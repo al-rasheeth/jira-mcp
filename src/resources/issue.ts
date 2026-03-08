@@ -65,7 +65,7 @@ export function registerIssueResources(server: McpServer): void {
               ? adfToMarkdown(c.body)
               : (c.body as string);
           lines.push(
-            `### ${c.author.displayName} — ${c.created}`,
+            `### ${c.author?.displayName ?? "Unknown"} — ${c.created}`,
             "",
             body.trim(),
             ""
