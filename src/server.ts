@@ -24,6 +24,7 @@ import { registerStandupSummaryPrompt } from "./prompts/standup-summary.js";
 import { registerEpicAnalysisPrompt } from "./prompts/epic-analysis.js";
 import { registerSprintRetrospectivePrompt } from "./prompts/sprint-retrospective.js";
 import { registerWorkloadBalancePrompt } from "./prompts/workload-balance.js";
+import { registerEpicDevPlanPrompt } from "./prompts/epic-dev-plan.js";
 
 export function createServer(): McpServer {
   const server = new McpServer(
@@ -60,7 +61,7 @@ export function createServer(): McpServer {
   registerMyselfResources(server);
   registerIssueResources(server);
 
-  // Prompts (7)
+  // Prompts (8)
   registerSprintPlanningPrompt(server);
   registerBugTriagePrompt(server);
   registerReleaseNotesPrompt(server);
@@ -68,6 +69,7 @@ export function createServer(): McpServer {
   registerEpicAnalysisPrompt(server);
   registerSprintRetrospectivePrompt(server);
   registerWorkloadBalancePrompt(server);
+  registerEpicDevPlanPrompt(server);
 
   return server;
 }
