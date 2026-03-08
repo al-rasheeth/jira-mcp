@@ -1,3 +1,4 @@
+import { ProxyAgent } from "undici";
 import { getConfig, type Config } from "../config.js";
 import { getCache, type EntityType } from "../cache/cache.js";
 import type { JiraErrorResponse } from "./types.js";
@@ -70,7 +71,7 @@ export class JiraClient {
   private config: Config;
   private authHeader: string;
   private bucket: TokenBucket;
-  private dispatcher: unknown;
+  private dispatcher: ProxyAgent | undefined;
 
   constructor() {
     this.config = getConfig();
@@ -89,27 +90,13 @@ export class JiraClient {
       this.config.rateLimit
     );
 
-    this.dispatcher = undefined;
     if (this.config.proxyUrl) {
-      this.initProxy(this.config.proxyUrl);
-    }
-  }
-
-  private async initProxy(proxyUrl: string): Promise<void> {
-    try {
-      // Dynamic import - undici ships with Node 18+ but types may not be available
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const undici = await (Function('return import("undici")')() as Promise<{
-        ProxyAgent: new (opts: Record<string, unknown>) => unknown;
-      }>);
-      this.dispatcher = new undici.ProxyAgent({
-        uri: proxyUrl,
+      this.dispatcher = new ProxyAgent({
+        uri: this.config.proxyUrl,
         ...(this.config.insecure
           ? { requestTls: { rejectUnauthorized: false } }
           : {}),
       });
-    } catch {
-      // undici not available; proxy will not be used
     }
   }
 

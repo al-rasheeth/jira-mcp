@@ -13,7 +13,12 @@
     "start": "node build/index.js",
     "clean": "rm -rf build"
   },
-  "keywords": ["mcp", "jira", "atlassian", "model-context-protocol"],
+  "keywords": [
+    "mcp",
+    "jira",
+    "atlassian",
+    "model-context-protocol"
+  ],
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
@@ -21,6 +26,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.0",
     "lru-cache": "^11.0.0",
+    "undici": "^7.22.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
