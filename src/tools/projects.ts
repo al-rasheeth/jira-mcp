@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { toonProject, toonProjects } from "../formatter/toon.js";
+import { textContent } from "./response.js";
 import type { JiraProject } from "../client/types.js";
 
 export function registerProjectTools(server: McpServer): void {
@@ -32,10 +33,7 @@ export function registerProjectTools(server: McpServer): void {
 
       const projects = raw.values ?? [];
 
-      const text = toonProjects(projects);
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(toonProjects(projects));
     }
   );
 
@@ -60,9 +58,7 @@ export function registerProjectTools(server: McpServer): void {
         { key: cache.buildKey("project", projectKey), entity: "project" }
       );
 
-      return {
-        content: [{ type: "text" as const, text: toonProject(project) }],
-      };
+      return textContent(toonProject(project));
     }
   );
 }

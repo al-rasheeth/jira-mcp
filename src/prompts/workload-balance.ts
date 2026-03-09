@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getConfig } from "../config.js";
-import { toonWorkloadContext, toonResult } from "../formatter/toon.js";
+import { toonWorkloadContext, toonResult, PROJECT_KEY_REQUIRED } from "../formatter/toon.js";
 import type { JiraIssue } from "../client/types.js";
 
 export function registerWorkloadBalancePrompt(server: McpServer): void {
@@ -32,7 +32,7 @@ export function registerWorkloadBalancePrompt(server: McpServer): void {
               role: "user" as const,
               content: {
                 type: "text" as const,
-                text: toonResult("error", { message: "project key required" }),
+                text: toonResult("error", { message: PROJECT_KEY_REQUIRED }),
               },
             },
           ],

@@ -5,6 +5,7 @@ import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
 import { adfToMarkdown, markdownToAdf } from "../client/adf-converter.js";
 import { toonComments, toonResult } from "../formatter/toon.js";
+import { textContent } from "./response.js";
 import type { JiraComment } from "../client/types.js";
 
 interface CommentsResponse {
@@ -39,10 +40,7 @@ export function registerCommentTools(server: McpServer): void {
           ? adfToMarkdown(c.body).trim()
           : (c.body as string)?.trim() ?? ""
       );
-      const text = toonComments(issueKey, data.comments, data.total, bodyTexts);
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(toonComments(issueKey, data.comments, data.total, bodyTexts));
     }
   );
 
@@ -75,14 +73,7 @@ export function registerCommentTools(server: McpServer): void {
       getCache().invalidateIssue(issueKey);
       getCache().invalidateEntity("comment");
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: toonResult("comment_added", { issueKey, commentId: result.id }),
-          },
-        ],
-      };
+      return textContent(toonResult("comment_added", { issueKey, commentId: result.id }));
     }
   );
 }

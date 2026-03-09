@@ -4,6 +4,7 @@ import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
 import { toonLinks, toonResult } from "../formatter/toon.js";
+import { textContent } from "./response.js";
 import type {
   JiraIssue,
   JiraIssueLink,
@@ -52,10 +53,7 @@ export function registerLinkTools(server: McpServer): void {
           });
         }
       }
-      const text = toonLinks(issueKey, issue.fields.summary, linkRows);
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(toonLinks(issueKey, issue.fields.summary, linkRows));
     }
   );
 
@@ -98,18 +96,11 @@ export function registerLinkTools(server: McpServer): void {
       getCache().invalidateIssue(outwardIssueKey);
       getCache().invalidateEntity("link");
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: toonResult("linked", {
-              linkType,
-              inwardIssueKey,
-              outwardIssueKey,
-            }),
-          },
-        ],
-      };
+      return textContent(toonResult("linked", {
+        linkType,
+        inwardIssueKey,
+        outwardIssueKey,
+      }));
     }
   );
 }

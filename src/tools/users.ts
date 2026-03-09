@@ -4,6 +4,7 @@ import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
 import { toonUsers, toonResult } from "../formatter/toon.js";
+import { textContent } from "./response.js";
 import type { JiraUser } from "../client/types.js";
 
 export function registerUserTools(server: McpServer): void {
@@ -30,10 +31,7 @@ export function registerUserTools(server: McpServer): void {
         { key: cache.buildKey("user", query, String(maxResults)), entity: "user" }
       ) as unknown as JiraUser[];
 
-      const text = toonUsers(users);
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(toonUsers(users));
     }
   );
 
@@ -70,17 +68,10 @@ export function registerUserTools(server: McpServer): void {
 
       getCache().invalidateIssue(issueKey);
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: toonResult("assigned", {
-              issueKey,
-              assigneeId: assigneeId ?? null,
-            }),
-          },
-        ],
-      };
+      return textContent(toonResult("assigned", {
+        issueKey,
+        assigneeId: assigneeId ?? null,
+      }));
     }
   );
 }

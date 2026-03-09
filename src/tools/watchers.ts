@@ -4,6 +4,7 @@ import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
 import { toonWatchers, toonResult } from "../formatter/toon.js";
+import { textContent } from "./response.js";
 import type { JiraWatchersResponse } from "../client/types.js";
 
 export function registerWatcherTools(server: McpServer): void {
@@ -25,10 +26,7 @@ export function registerWatcherTools(server: McpServer): void {
         { key: cache.buildKey("watcher", issueKey), entity: "watcher" }
       ) as unknown as JiraWatchersResponse;
 
-      const text = toonWatchers(issueKey, data.watchers, data.watchCount);
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(toonWatchers(issueKey, data.watchers, data.watchCount));
     }
   );
 
@@ -58,14 +56,7 @@ export function registerWatcherTools(server: McpServer): void {
 
       getCache().invalidateEntity("watcher");
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: toonResult("watcher_added", { issueKey, accountId }),
-          },
-        ],
-      };
+      return textContent(toonResult("watcher_added", { issueKey, accountId }));
     }
   );
 }

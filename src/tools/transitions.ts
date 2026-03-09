@@ -4,6 +4,7 @@ import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
 import { toonTransitions, toonResult } from "../formatter/toon.js";
+import { textContent } from "./response.js";
 import type { JiraTransitionsResponse } from "../client/types.js";
 
 export function registerTransitionTools(server: McpServer): void {
@@ -31,10 +32,7 @@ export function registerTransitionTools(server: McpServer): void {
         name: t.name,
         to: t.to.name,
       }));
-      const text = toonTransitions(issueKey, transitions);
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(toonTransitions(issueKey, transitions));
     }
   );
 
@@ -96,14 +94,7 @@ export function registerTransitionTools(server: McpServer): void {
       getCache().invalidateIssue(issueKey);
       getCache().invalidateEntity("transition");
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: toonResult("transitioned", { issueKey }),
-          },
-        ],
-      };
+      return textContent(toonResult("transitioned", { issueKey }));
     }
   );
 }

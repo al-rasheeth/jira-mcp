@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { toonVersions, toonComponents } from "../formatter/toon.js";
+import { textContent } from "./response.js";
 import type {
   JiraVersion,
   JiraComponent,
@@ -30,10 +31,7 @@ export function registerVersionAndComponentTools(server: McpServer): void {
 
       const versions = raw.values ?? [];
 
-      const text = toonVersions(versions, projectKey);
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(toonVersions(versions, projectKey));
     }
   );
 
@@ -57,10 +55,7 @@ export function registerVersionAndComponentTools(server: McpServer): void {
 
       const components = raw.values ?? [];
 
-      const text = toonComponents(components, projectKey);
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(toonComponents(components, projectKey));
     }
   );
 }

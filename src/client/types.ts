@@ -236,13 +236,6 @@ export interface JiraEpicsResponse {
   values: JiraEpic[];
 }
 
-export interface JiraEpicIssuesResponse {
-  maxResults: number;
-  startAt: number;
-  total: number;
-  issues: JiraIssue[];
-}
-
 // ─── Issue Links ────────────────────────────────────────────────────────────
 
 export interface JiraIssueLinkType {

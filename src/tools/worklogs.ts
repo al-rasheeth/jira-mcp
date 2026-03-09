@@ -5,6 +5,7 @@ import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
 import { adfToMarkdown } from "../client/adf-converter.js";
 import { toonWorklogs, toonResult } from "../formatter/toon.js";
+import { textContent } from "./response.js";
 import type {
   JiraWorklog,
   JiraWorklogsResponse,
@@ -42,16 +43,13 @@ export function registerWorklogTools(server: McpServer): void {
             : (w.comment as string)
           : ""
       );
-      const text = toonWorklogs(
+      return textContent(toonWorklogs(
         issueKey,
         data.worklogs,
         data.total,
         totalHours,
         bodyTexts
-      );
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      ));
     }
   );
 
@@ -119,18 +117,11 @@ export function registerWorklogTools(server: McpServer): void {
 
       getCache().invalidateEntity("worklog");
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: toonResult("worklog_added", {
-              issueKey,
-              timeSpent: result.timeSpent,
-              id: result.id,
-            }),
-          },
-        ],
-      };
+      return textContent(toonResult("worklog_added", {
+        issueKey,
+        timeSpent: result.timeSpent,
+        id: result.id,
+      }));
     }
   );
 }

@@ -12,6 +12,10 @@ import type {
   JiraUser,
 } from "../client/types.js";
 
+/** Message for missing project key (use with toonResult("error", { message: PROJECT_KEY_REQUIRED })). */
+export const PROJECT_KEY_REQUIRED =
+  "project key required. Set JIRA_DEFAULT_PROJECT or pass project";
+
 export function toon(data: unknown): string {
   return encode(data, { indent: 2 });
 }

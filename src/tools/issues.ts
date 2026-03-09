@@ -4,9 +4,9 @@ import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { adfToMarkdown, markdownToAdf } from "../client/adf-converter.js";
 import { getConfig } from "../config.js";
-import { toonIssue, toonSearchResults, toonResult } from "../formatter/toon.js";
+import { toonIssue, toonSearchResults, toonResult, PROJECT_KEY_REQUIRED } from "../formatter/toon.js";
+import { textContent } from "./response.js";
 import type {
-  JiraSearchResponse,
   JiraIssue,
   CreateIssuePayload,
   UpdateIssuePayload,
@@ -60,9 +60,7 @@ export function registerIssueTools(server: McpServer): void {
         data.nextPageToken
       );
 
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(text);
     }
   );
 
@@ -101,9 +99,7 @@ export function registerIssueTools(server: McpServer): void {
             : (c.body as string) ?? "",
       }));
 
-      return {
-        content: [{ type: "text" as const, text: toonIssue(issue, desc, comments) }],
-      };
+      return textContent(toonIssue(issue, desc, comments));
     }
   );
 
@@ -166,15 +162,7 @@ export function registerIssueTools(server: McpServer): void {
       const client = getClient();
       const projectKey = project ?? config.defaultProject;
       if (!projectKey) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: toonResult("error", { message: "project key required. Set JIRA_DEFAULT_PROJECT or pass project" }),
-            },
-          ],
-          isError: true,
-        };
+        return textContent(toonResult("error", { message: PROJECT_KEY_REQUIRED }), { isError: true });
       }
 
       const payload: CreateIssuePayload = {
@@ -214,17 +202,10 @@ export function registerIssueTools(server: McpServer): void {
 
       getCache().invalidateEntity("search");
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: toonResult("created", {
-              issueKey: result.key,
-              url: `${client.baseUrl}/browse/${result.key}`,
-            }),
-          },
-        ],
-      };
+      return textContent(toonResult("created", {
+        issueKey: result.key,
+        url: `${client.baseUrl}/browse/${result.key}`,
+      }));
     }
   );
 
@@ -284,14 +265,7 @@ export function registerIssueTools(server: McpServer): void {
 
       getCache().invalidateIssue(issueKey);
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: toonResult("updated", { issueKey }),
-          },
-        ],
-      };
+      return textContent(toonResult("updated", { issueKey }));
     }
   );
 
@@ -319,14 +293,7 @@ export function registerIssueTools(server: McpServer): void {
 
       getCache().invalidateIssue(issueKey);
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: toonResult("deleted", { issueKey }),
-          },
-        ],
-      };
+      return textContent(toonResult("deleted", { issueKey }));
     }
   );
 }

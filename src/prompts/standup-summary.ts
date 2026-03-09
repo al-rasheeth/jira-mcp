@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getConfig } from "../config.js";
-import { toonStandupContext, toonResult } from "../formatter/toon.js";
+import { toonStandupContext, toonResult, PROJECT_KEY_REQUIRED } from "../formatter/toon.js";
 
 export function registerStandupSummaryPrompt(server: McpServer): void {
   const config = getConfig();
@@ -38,7 +38,7 @@ export function registerStandupSummaryPrompt(server: McpServer): void {
               role: "user" as const,
               content: {
                 type: "text" as const,
-                text: toonResult("error", { message: "project key required" }),
+                text: toonResult("error", { message: PROJECT_KEY_REQUIRED }),
               },
             },
           ],

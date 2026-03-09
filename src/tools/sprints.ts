@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { toonBoards, toonSprints, toonSprintIssues } from "../formatter/toon.js";
+import { textContent } from "./response.js";
 import type {
   JiraBoard,
   JiraBoardsResponse,
@@ -43,10 +44,7 @@ export function registerSprintTools(server: McpServer): void {
         { key: cache.buildKey("board", "list", type ?? "", projectKeyOrId ?? "", String(maxResults)), entity: "board" }
       ) as unknown as JiraBoardsResponse;
 
-      const text = toonBoards(data.values as JiraBoard[]);
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(toonBoards(data.values as JiraBoard[]));
     }
   );
 
@@ -72,10 +70,7 @@ export function registerSprintTools(server: McpServer): void {
         { key: cache.buildKey("sprint", String(boardId), state ?? ""), entity: "sprint" }
       ) as unknown as JiraSprintsResponse;
 
-      const text = toonSprints(data.values as JiraSprint[]);
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(toonSprints(data.values as JiraSprint[]));
     }
   );
 
@@ -102,10 +97,7 @@ export function registerSprintTools(server: McpServer): void {
         { key: cache.buildKey("sprint", "issues", String(sprintId), String(maxResults)), entity: "sprint" }
       ) as unknown as JiraSprintIssuesResponse;
 
-      const text = toonSprintIssues(data.issues as JiraIssue[], data.total);
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(toonSprintIssues(data.issues as JiraIssue[], data.total));
     }
   );
 }

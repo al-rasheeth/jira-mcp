@@ -4,6 +4,7 @@ import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
 import { toonEpics, toonEpicDetail, toonResult } from "../formatter/toon.js";
+import { textContent } from "./response.js";
 import type {
   JiraEpic,
   JiraEpicsResponse,
@@ -35,10 +36,7 @@ export function registerEpicTools(server: McpServer): void {
         { key: cache.buildKey("epic", "list", String(boardId), String(done ?? ""), String(maxResults)), entity: "epic" }
       ) as unknown as JiraEpicsResponse;
 
-      const text = toonEpics(data.values as JiraEpic[]);
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      return textContent(toonEpics(data.values as JiraEpic[]));
     }
   );
 
@@ -111,7 +109,7 @@ export function registerEpicTools(server: McpServer): void {
         assignee: i.fields.assignee?.displayName ?? "Unassigned",
       }));
 
-      const text = toonEpicDetail(
+      return textContent(toonEpicDetail(
         epicKey,
         ef.summary,
         ef.status.name,
@@ -124,11 +122,7 @@ export function registerEpicTools(server: McpServer): void {
         byPriority,
         byAssignee,
         childIssues
-      );
-
-      return {
-        content: [{ type: "text" as const, text }],
-      };
+      ));
     }
   );
 
@@ -163,14 +157,7 @@ export function registerEpicTools(server: McpServer): void {
         getCache().invalidateIssue(key);
       }
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: toonResult("moved", { epicKey, issueKeys, count: issueKeys.length }),
-          },
-        ],
-      };
+      return textContent(toonResult("moved", { epicKey, issueKeys, count: issueKeys.length }));
     }
   );
 }
