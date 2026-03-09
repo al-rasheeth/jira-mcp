@@ -99,6 +99,7 @@ For on-premise JIRA with Personal Access Token:
 | `JIRA_REQUEST_TIMEOUT` | No | `30000` | Request timeout (ms) |
 | `JIRA_MAX_RETRIES` | No | `3` | Retry count for transient failures |
 | `JIRA_RATE_LIMIT` | No | `10` | Max requests per second |
+| `JIRA_MAX_RESULTS_LIMIT` | No | `100` | Max value for `maxResults` in tools/prompts (1–1000) |
 | `JIRA_CUSTOM_FIELDS` | No | — | JSON map: `{"storyPoints": "customfield_10016"}` |
 | `JIRA_DEFAULT_PROJECT` | No | — | Default project key |
 | `JIRA_WRITE_ENABLED` | No | `false` | Set to `"true"` to enable write tools (create, update, delete, etc.) |

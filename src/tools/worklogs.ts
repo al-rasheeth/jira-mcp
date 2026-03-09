@@ -12,6 +12,7 @@ import type {
 } from "../client/types.js";
 
 export function registerWorklogTools(server: McpServer): void {
+  const maxLimit = getConfig().maxResultsLimit;
   server.registerTool(
     "get_worklogs",
     {
@@ -19,7 +20,7 @@ export function registerWorklogTools(server: McpServer): void {
       description: "Get time tracking worklogs for an issue.",
       inputSchema: z.object({
         issueKey: z.string().describe("Issue key, e.g. PROJ-123"),
-        maxResults: z.coerce.number().int().min(1).max(100).default(20),
+        maxResults: z.coerce.number().int().min(1).max(maxLimit).default(20),
       }),
       annotations: { readOnlyHint: true },
     },

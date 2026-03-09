@@ -1,10 +1,12 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { getConfig } from "../config.js";
 import { adfToMarkdown } from "../client/adf-converter.js";
 import { toonBugTriageContext } from "../formatter/toon.js";
 
 export function registerBugTriagePrompt(server: McpServer): void {
+  const maxLimit = getConfig().maxResultsLimit;
   server.registerPrompt(
     "bug-triage",
     {
@@ -16,7 +18,7 @@ export function registerBugTriagePrompt(server: McpServer): void {
           .string()
           .default('issuetype = Bug AND resolution = Unresolved ORDER BY priority DESC, created DESC')
           .describe("JQL to find bugs (defaults to all unresolved bugs)"),
-        maxResults: z.coerce.number().int().min(1).max(50).default(20),
+        maxResults: z.coerce.number().int().min(1).max(maxLimit).default(20),
       },
     },
     async ({ jql, maxResults }) => {

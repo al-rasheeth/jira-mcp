@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { getConfig } from "../config.js";
 import { adfToMarkdown } from "../client/adf-converter.js";
 import { toonEpicDevPlanContext } from "../formatter/toon.js";
 import type {
@@ -59,7 +60,7 @@ export function registerEpicDevPlanPrompt(server: McpServer): void {
 
       const childData = await client.search({
         jql: childJql,
-        maxResults: 100,
+        maxResults: getConfig().maxResultsLimit,
         fields: [
           "summary",
           "status",

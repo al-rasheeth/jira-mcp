@@ -2,11 +2,13 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
+import { getConfig } from "../config.js";
 import { toonProject, toonProjects } from "../formatter/toon.js";
 import { textContent } from "./response.js";
 import type { JiraProject } from "../client/types.js";
 
 export function registerProjectTools(server: McpServer): void {
+  const maxLimit = getConfig().maxResultsLimit;
   server.registerTool(
     "list_projects",
     {
@@ -17,7 +19,7 @@ export function registerProjectTools(server: McpServer): void {
           .coerce.number()
           .int()
           .min(1)
-          .max(200)
+          .max(maxLimit)
           .default(50)
           .describe("Max projects to return"),
       }),

@@ -12,6 +12,7 @@ import type {
 } from "../client/types.js";
 
 export function registerEpicTools(server: McpServer): void {
+  const maxLimit = getConfig().maxResultsLimit;
   server.registerTool(
     "list_epics",
     {
@@ -24,7 +25,7 @@ export function registerEpicTools(server: McpServer): void {
           .coerce.boolean()
           .optional()
           .describe("Filter by done status (true = closed epics)"),
-        maxResults: z.coerce.number().int().min(1).max(100).default(50),
+        maxResults: z.coerce.number().int().min(1).max(maxLimit).default(50),
       }),
       annotations: { readOnlyHint: true },
     },
@@ -52,7 +53,7 @@ export function registerEpicTools(server: McpServer): void {
           .coerce.number()
           .int()
           .min(1)
-          .max(100)
+          .max(maxLimit)
           .default(50)
           .describe("Max child issues to return"),
       }),

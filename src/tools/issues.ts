@@ -14,6 +14,7 @@ import type {
 
 export function registerIssueTools(server: McpServer): void {
   const config = getConfig();
+  const maxLimit = config.maxResultsLimit;
 
   server.registerTool(
     "search_issues",
@@ -27,7 +28,7 @@ export function registerIssueTools(server: McpServer): void {
           .coerce.number()
           .int()
           .min(1)
-          .max(100)
+          .max(maxLimit)
           .default(20)
           .describe("Max results to return"),
         fields: z

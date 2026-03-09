@@ -8,6 +8,7 @@ import { textContent } from "./response.js";
 import type { JiraUser } from "../client/types.js";
 
 export function registerUserTools(server: McpServer): void {
+  const maxLimit = getConfig().maxResultsLimit;
   server.registerTool(
     "search_users",
     {
@@ -15,7 +16,7 @@ export function registerUserTools(server: McpServer): void {
       description: "Search for JIRA users by display name or email.",
       inputSchema: z.object({
         query: z.string().describe("Search query (name or email)"),
-        maxResults: z.coerce.number().int().min(1).max(50).default(10),
+        maxResults: z.coerce.number().int().min(1).max(maxLimit).default(10),
       }),
       annotations: { readOnlyHint: true },
     },

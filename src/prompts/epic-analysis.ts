@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { getConfig } from "../config.js";
 import { toonEpicAnalysisContext } from "../formatter/toon.js";
 import type { JiraIssue } from "../client/types.js";
 
@@ -29,7 +30,7 @@ export function registerEpicAnalysisPrompt(server: McpServer): void {
 
       const childData = await client.search({
         jql: childJql,
-        maxResults: 100,
+        maxResults: getConfig().maxResultsLimit,
         fields: [
           "summary",
           "status",

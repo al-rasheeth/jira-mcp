@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { getConfig } from "../config.js";
 import { toonSprintRetroContext } from "../formatter/toon.js";
 import type {
   JiraSprint,
@@ -32,7 +33,7 @@ export function registerSprintRetrospectivePrompt(server: McpServer): void {
           boardId,
           sprintId,
           fields: ['summary', 'status', 'priority', 'assignee', 'issuetype', 'labels', 'project', 'resolution', 'created', 'updated'],
-          maxResults: 100,
+          maxResults: getConfig().maxResultsLimit,
         })
       ) as unknown as JiraSprintIssuesResponse;
 

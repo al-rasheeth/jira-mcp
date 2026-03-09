@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { getConfig } from "../config.js";
 import { toonSprintContext } from "../formatter/toon.js";
 import type {
   JiraSprint,
@@ -31,7 +32,7 @@ export function registerSprintPlanningPrompt(server: McpServer): void {
           boardId,
           sprintId,
           fields: ['summary', 'status', 'priority', 'assignee', 'issuetype', 'labels', 'project'],
-          maxResults: 100,
+          maxResults: getConfig().maxResultsLimit,
         })
       ) as unknown as JiraSprintIssuesResponse;
 

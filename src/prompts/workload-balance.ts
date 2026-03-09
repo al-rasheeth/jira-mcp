@@ -43,7 +43,7 @@ export function registerWorkloadBalancePrompt(server: McpServer): void {
 
       const openIssues = await client.search({
         jql: `project = "${projectKey}" AND resolution = Unresolved ORDER BY assignee ASC, priority DESC`,
-        maxResults: 100,
+        maxResults: config.maxResultsLimit,
         fields: [
           "summary",
           "status",

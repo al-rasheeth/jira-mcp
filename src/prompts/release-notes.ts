@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { getConfig } from "../config.js";
 import { toonReleaseNotesContext } from "../formatter/toon.js";
 
 export function registerReleaseNotesPrompt(server: McpServer): void {
@@ -24,7 +25,7 @@ export function registerReleaseNotesPrompt(server: McpServer): void {
 
       const data = await client.search({
         jql,
-        maxResults: 100,
+        maxResults: getConfig().maxResultsLimit,
         fields: [
           "summary",
           "issuetype",

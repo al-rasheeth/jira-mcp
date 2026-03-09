@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
+import { getConfig } from "../config.js";
 import { toonBoards, toonSprints, toonSprintIssues } from "../formatter/toon.js";
 import { textContent } from "./response.js";
 import type {
@@ -14,6 +15,7 @@ import type {
 } from "../client/types.js";
 
 export function registerSprintTools(server: McpServer): void {
+  const maxLimit = getConfig().maxResultsLimit;
   server.registerTool(
     "list_boards",
     {
@@ -28,7 +30,7 @@ export function registerSprintTools(server: McpServer): void {
           .enum(["scrum", "kanban", "simple"])
           .optional()
           .describe("Board type filter"),
-        maxResults: z.coerce.number().int().min(1).max(100).default(50),
+        maxResults: z.coerce.number().int().min(1).max(maxLimit).default(50),
       }),
       annotations: { readOnlyHint: true },
     },
@@ -81,7 +83,7 @@ export function registerSprintTools(server: McpServer): void {
       description: "Get all issues in a specific sprint.",
       inputSchema: z.object({
         sprintId: z.coerce.number().int().describe("Sprint ID"),
-        maxResults: z.coerce.number().int().min(1).max(100).default(50),
+        maxResults: z.coerce.number().int().min(1).max(maxLimit).default(50),
       }),
       annotations: { readOnlyHint: true },
     },

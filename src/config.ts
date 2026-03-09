@@ -14,6 +14,7 @@ const configSchema = z.object({
   requestTimeout: z.coerce.number().int().min(1000).default(30000),
   maxRetries: z.coerce.number().int().min(0).max(10).default(3),
   rateLimit: z.coerce.number().min(1).default(10),
+  maxResultsLimit: z.coerce.number().int().min(1).max(1000).default(100),
   customFields: z
     .string()
     .optional()
@@ -61,6 +62,7 @@ export function loadConfig(): Config {
     requestTimeout: process.env.JIRA_REQUEST_TIMEOUT,
     maxRetries: process.env.JIRA_MAX_RETRIES,
     rateLimit: process.env.JIRA_RATE_LIMIT,
+    maxResultsLimit: process.env.JIRA_MAX_RESULTS_LIMIT,
     customFields: process.env.JIRA_CUSTOM_FIELDS,
     defaultProject: process.env.JIRA_DEFAULT_PROJECT,
     writeEnabled: process.env.JIRA_WRITE_ENABLED,
