@@ -19,6 +19,14 @@ const projectRoot = process.cwd();
 const serverEntry = resolve(projectRoot, "build/index.js");
 const serverSource = resolve(projectRoot, "src/index.ts");
 
+function serverEnv(): Record<string, string> {
+  const env = { ...process.env } as Record<string, string>;
+  if (process.env.JIRA_INSECURE === "true") {
+    env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+  }
+  return env;
+}
+
 async function main(): Promise<void> {
   const useBuild = await import("node:fs").then((fs) =>
     fs.promises.access(serverEntry).then(() => true, () => false)
@@ -26,7 +34,7 @@ async function main(): Promise<void> {
   const transport = new StdioClientTransport({
     command: useBuild ? "node" : "npx",
     args: useBuild ? [serverEntry] : ["tsx", serverSource],
-    env: process.env as Record<string, string>,
+    env: serverEnv(),
     stderr: "inherit",
   });
 

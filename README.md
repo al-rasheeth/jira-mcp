@@ -17,7 +17,7 @@ Run the built-in MCP test client (loads `.env` from the project root) to list an
 npm run test-client
 ```
 
-Create a `.env` with at least `JIRA_BASE_URL` and `JIRA_API_TOKEN` (and `JIRA_EMAIL` for Cloud).
+Create a `.env` with at least `JIRA_BASE_URL` and `JIRA_API_TOKEN` (and `JIRA_EMAIL` for Cloud). If you see **"unable to get local issuer certificate"** (e.g. corporate proxy or self-signed cert), add `JIRA_INSECURE=true` to `.env`; the test client will disable TLS verification for the spawned server.
 
 **Quick test** — list projects to verify the server and credentials:
 
