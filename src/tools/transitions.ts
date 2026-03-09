@@ -3,10 +3,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
-import type {
-  JiraTransitionsResponse,
-  TransitionIssuePayload,
-} from "../client/types.js";
+import { toonTransitions, toonResult } from "../formatter/toon.js";
+import type { JiraTransitionsResponse } from "../client/types.js";
 
 export function registerTransitionTools(server: McpServer): void {
   server.registerTool(
@@ -28,28 +26,14 @@ export function registerTransitionTools(server: McpServer): void {
         { key: cache.buildKey("transition", issueKey), entity: "transition" }
       ) as unknown as JiraTransitionsResponse;
 
-      if (data.transitions.length === 0) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `No transitions available for **${issueKey}**.`,
-            },
-          ],
-        };
-      }
-
-      const text = data.transitions
-        .map((t) => `- **ID ${t.id}**: ${t.name} → *${t.to.name}*`)
-        .join("\n");
-
+      const transitions = data.transitions.map((t) => ({
+        id: t.id,
+        name: t.name,
+        to: t.to.name,
+      }));
+      const text = toonTransitions(issueKey, transitions);
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Available transitions for **${issueKey}**:\n\n${text}\n\nUse the transition ID with the \`transition_issue\` tool.`,
-          },
-        ],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -116,7 +100,7 @@ export function registerTransitionTools(server: McpServer): void {
         content: [
           {
             type: "text" as const,
-            text: `Issue **${issueKey}** transitioned successfully.`,
+            text: toonResult("transitioned", { issueKey }),
           },
         ],
       };

@@ -4,7 +4,8 @@ import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
 import { adfToMarkdown, markdownToAdf } from "../client/adf-converter.js";
-import type { JiraComment, AddCommentPayload } from "../client/types.js";
+import { toonComments, toonResult } from "../formatter/toon.js";
+import type { JiraComment } from "../client/types.js";
 
 interface CommentsResponse {
   comments: JiraComment[];
@@ -33,38 +34,14 @@ export function registerCommentTools(server: McpServer): void {
         { key: cache.buildKey("comment", issueKey, String(maxResults)), entity: "comment" }
       ) as unknown as CommentsResponse;
 
-      if (data.comments.length === 0) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `No comments on **${issueKey}**.`,
-            },
-          ],
-        };
-      }
-
-      const lines = [
-        `**${data.total}** comment(s) on **${issueKey}** (showing ${data.comments.length}):`,
-        "",
-      ];
-
-      for (const c of data.comments) {
-        const body =
-          client.isCloud && typeof c.body === "object"
-            ? adfToMarkdown(c.body)
-            : (c.body as string);
-        lines.push(
-          `---`,
-          `**${c.author?.displayName ?? "Unknown"}** — ${c.created}`,
-          "",
-          body.trim(),
-          ""
-        );
-      }
-
+      const bodyTexts = data.comments.map((c) =>
+        client.isCloud && typeof c.body === "object"
+          ? adfToMarkdown(c.body).trim()
+          : (c.body as string)?.trim() ?? ""
+      );
+      const text = toonComments(issueKey, data.comments, data.total, bodyTexts);
       return {
-        content: [{ type: "text" as const, text: lines.join("\n") }],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -102,7 +79,7 @@ export function registerCommentTools(server: McpServer): void {
         content: [
           {
             type: "text" as const,
-            text: `Comment added to **${issueKey}** (ID: ${result.id}).`,
+            text: toonResult("comment_added", { issueKey, commentId: result.id }),
           },
         ],
       };

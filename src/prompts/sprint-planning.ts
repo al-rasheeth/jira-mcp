@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { toonSprintContext } from "../formatter/toon.js";
 import type {
   JiraSprint,
   JiraSprintIssuesResponse,
@@ -34,31 +35,27 @@ export function registerSprintPlanningPrompt(server: McpServer): void {
         })
       ) as unknown as JiraSprintIssuesResponse;
 
-      const issueLines = issuesData.issues
-        .map(
-          (i) =>
-            `- **${i.key}** ${i.fields.summary} | Type: ${i.fields.issuetype.name} | Priority: ${i.fields.priority?.name ?? "None"} | Status: ${i.fields.status.name} | Assignee: ${i.fields.assignee?.displayName ?? "Unassigned"}`
-        )
-        .join("\n");
+      const issues = issuesData.issues.map((i) => ({
+        key: i.key,
+        summary: i.fields.summary,
+        type: i.fields.issuetype.name,
+        priority: i.fields.priority?.name ?? "None",
+        status: i.fields.status.name,
+        assignee: i.fields.assignee?.displayName ?? "Unassigned",
+      }));
 
-      const context = [
-        `## Sprint: ${sprint.name}`,
-        `- **State**: ${sprint.state}`,
-        sprint.startDate
-          ? `- **Start**: ${sprint.startDate.split("T")[0]}`
-          : null,
-        sprint.endDate
-          ? `- **End**: ${sprint.endDate.split("T")[0]}`
-          : null,
-        sprint.goal ? `- **Goal**: ${sprint.goal}` : null,
-        `- **Board ID**: ${boardId}`,
-        "",
-        `## Issues (${issuesData.total} total)`,
-        "",
-        issueLines,
-      ]
-        .filter(Boolean)
-        .join("\n");
+      const context = toonSprintContext({
+        sprint: {
+          name: sprint.name,
+          state: sprint.state,
+          startDate: sprint.startDate?.split("T")[0],
+          endDate: sprint.endDate?.split("T")[0],
+          goal: sprint.goal ?? undefined,
+          boardId,
+        },
+        issues,
+        total: issuesData.total,
+      });
 
       return {
         messages: [
@@ -68,10 +65,10 @@ export function registerSprintPlanningPrompt(server: McpServer): void {
               type: "text" as const,
               text: `You are a JIRA sprint planning assistant. Analyze the following sprint data and provide:
 
-1. **Workload Distribution**: How work is distributed across team members
-2. **Risk Assessment**: Issues that might be at risk (high priority unassigned, blockers, etc.)
-3. **Sprint Health**: Overall assessment of whether the sprint goal is achievable
-4. **Recommendations**: Concrete suggestions to improve the sprint outcome
+1. Workload Distribution: How work is distributed across team members
+2. Risk Assessment: Issues that might be at risk (high priority unassigned, blockers, etc.)
+3. Sprint Health: Overall assessment of whether the sprint goal is achievable
+4. Recommendations: Concrete suggestions to improve the sprint outcome
 
 ${context}`,
             },

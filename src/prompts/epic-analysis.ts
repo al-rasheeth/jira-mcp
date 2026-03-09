@@ -1,10 +1,8 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
-import type {
-  JiraIssue,
-  JiraSearchResponse,
-} from "../client/types.js";
+import { toonEpicAnalysisContext } from "../formatter/toon.js";
+import type { JiraIssue } from "../client/types.js";
 
 export function registerEpicAnalysisPrompt(server: McpServer): void {
   server.registerPrompt(
@@ -119,74 +117,51 @@ export function registerEpicAnalysisPrompt(server: McpServer): void {
 
       const ef = epicIssue.fields;
 
-      const statusBreakdown = Object.entries(byStatus)
-        .sort(([, a], [, b]) => b.length - a.length)
-        .map(([status, items]) => `- ${status}: **${items.length}**`)
-        .join("\n");
+      const byStatusCounts: Record<string, number> = {};
+      for (const [k, items] of Object.entries(byStatus)) {
+        byStatusCounts[k] = items.length;
+      }
 
       const assigneeBreakdown = Object.entries(byAssignee)
         .sort(([, a], [, b]) => b.length - a.length)
-        .map(([name, items]) => {
-          const done = items.filter(
-            (i) => i.fields.status.statusCategory.key === "done"
-          ).length;
-          return `- ${name}: **${items.length}** total, ${done} done`;
-        })
-        .join("\n");
+        .map(([name, items]) => ({
+          name,
+          total: items.length,
+          done: items.filter((i) => i.fields.status.statusCategory.key === "done").length,
+        }));
 
-      const typeBreakdown = Object.entries(byType)
-        .sort(([, a], [, b]) => b - a)
-        .map(([type, count]) => `- ${type}: **${count}**`)
-        .join("\n");
+      const issuesList = issues.map((i) => ({
+        key: i.key,
+        summary: i.fields.summary,
+        type: i.fields.issuetype.name,
+        status: i.fields.status.name,
+        priority: i.fields.priority?.name ?? "None",
+        assignee: i.fields.assignee?.displayName ?? "Unassigned",
+        updated: i.fields.updated.split("T")[0],
+      }));
 
-      const issueList = issues
-        .map(
-          (i) =>
-            `- **${i.key}** ${i.fields.summary} | ${i.fields.issuetype.name} | ${i.fields.status.name} | ${i.fields.priority?.name ?? "None"} | ${i.fields.assignee?.displayName ?? "Unassigned"} | Updated: ${i.fields.updated.split("T")[0]}`
-        )
-        .join("\n");
-
-      const context = [
-        `## Epic: [${epicKey}] ${ef.summary}`,
-        `- **Project**: ${ef.project.key} — ${ef.project.name}`,
-        `- **Status**: ${ef.status.name}`,
-        `- **Priority**: ${ef.priority?.name ?? "None"}`,
-        `- **Assignee**: ${ef.assignee?.displayName ?? "Unassigned"}`,
-        `- **Labels**: ${ef.labels?.join(", ") || "None"}`,
-        ef.fixVersions?.length
-          ? `- **Fix Versions**: ${ef.fixVersions.map((v) => v.name).join(", ")}`
-          : null,
-        ef.components?.length
-          ? `- **Components**: ${ef.components.map((c) => c.name).join(", ")}`
-          : null,
-        "",
-        `## Progress: **${completionPct}%** (${doneCount}/${total} done, ${inProgressCount} in progress)`,
-        "",
-        "### By Status",
-        statusBreakdown,
-        "",
-        "### By Issue Type",
-        typeBreakdown,
-        "",
-        "### By Assignee",
-        assigneeBreakdown,
-        "",
-        blockers.length
-          ? `### Blockers (${blockers.length})\n${blockers.map((b) => `- ${b}`).join("\n")}`
-          : "### Blockers\nNone detected.",
-        "",
-        unassignedHighPri.length
-          ? `### Unassigned High-Priority Issues (${unassignedHighPri.length})\n${unassignedHighPri.map((u) => `- ${u}`).join("\n")}`
-          : "",
-        staleIssues.length
-          ? `### Stale Issues (>${STALE_DAYS} days without update)\n${staleIssues.map((s) => `- ${s}`).join("\n")}`
-          : "",
-        "",
-        "### All Issues",
-        issueList,
-      ]
-        .filter(Boolean)
-        .join("\n");
+      const context = toonEpicAnalysisContext({
+        epicKey,
+        epicSummary: ef.summary,
+        project: `${ef.project.key} — ${ef.project.name}`,
+        status: ef.status.name,
+        priority: ef.priority?.name ?? "None",
+        assignee: ef.assignee?.displayName ?? "Unassigned",
+        labels: ef.labels?.join(", ") || "None",
+        fixVersions: ef.fixVersions?.length ? ef.fixVersions.map((v) => v.name).join(", ") : undefined,
+        components: ef.components?.length ? ef.components.map((c) => c.name).join(", ") : undefined,
+        completionPct,
+        doneCount,
+        total,
+        inProgressCount,
+        byStatus: byStatusCounts,
+        byType,
+        byAssignee: assigneeBreakdown,
+        blockers,
+        unassignedHighPri,
+        staleIssues,
+        issues: issuesList,
+      });
 
       return {
         messages: [
@@ -196,12 +171,12 @@ export function registerEpicAnalysisPrompt(server: McpServer): void {
               type: "text" as const,
               text: `You are a JIRA epic analysis expert. Analyze this epic and provide a comprehensive report:
 
-1. **Health Score**: Rate the epic's health (Healthy / At Risk / Critical) with justification
-2. **Completion Forecast**: Based on current velocity and remaining work, estimate completion timeline
-3. **Risk Assessment**: Identify blockers, unassigned high-priority issues, stale items, and dependency risks
-4. **Team Load**: Analyze workload distribution across assignees — who is overloaded or has capacity
-5. **Recommendations**: Concrete actionable steps to get this epic back on track or keep it healthy
-6. **Priority Ranking**: Which remaining issues should be tackled first and why
+1. Health Score: Rate the epic's health (Healthy / At Risk / Critical) with justification
+2. Completion Forecast: Based on current velocity and remaining work, estimate completion timeline
+3. Risk Assessment: Identify blockers, unassigned high-priority issues, stale items, and dependency risks
+4. Team Load: Analyze workload distribution across assignees — who is overloaded or has capacity
+5. Recommendations: Concrete actionable steps to get this epic back on track or keep it healthy
+6. Priority Ranking: Which remaining issues should be tackled first and why
 
 ${context}`,
             },

@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
+import { toonBoards } from "../formatter/toon.js";
 import type { JiraBoard } from "../client/types.js";
 
 export function registerBoardResources(server: McpServer): void {
@@ -10,7 +11,7 @@ export function registerBoardResources(server: McpServer): void {
     {
       title: "JIRA Boards",
       description: "List of all agile boards (Scrum/Kanban)",
-      mimeType: "text/markdown",
+      mimeType: "text/plain",
     },
     async (uri) => {
       const client = getClient();
@@ -28,15 +29,9 @@ export function registerBoardResources(server: McpServer): void {
         (result as { values?: unknown[] }).values ?? []
       ) as unknown as JiraBoard[];
 
-      const lines = ["# JIRA Boards", ""];
-      for (const b of boards) {
-        lines.push(
-          `- **#${b.id}** ${b.name} (${b.type})${b.location?.projectKey ? ` — Project: ${b.location.projectKey}` : ""}`
-        );
-      }
-
+      const text = toonBoards(boards);
       return {
-        contents: [{ uri: uri.href, mimeType: "text/markdown", text: lines.join("\n") }],
+        contents: [{ uri: uri.href, mimeType: "text/plain", text }],
       };
     }
   );

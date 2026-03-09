@@ -3,10 +3,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
+import { toonLinks, toonResult } from "../formatter/toon.js";
 import type {
   JiraIssue,
   JiraIssueLink,
-  LinkIssuesPayload,
 } from "../client/types.js";
 
 export function registerLinkTools(server: McpServer): void {
@@ -31,36 +31,30 @@ export function registerLinkTools(server: McpServer): void {
 
       const links = (issue.fields.issuelinks ?? []) as JiraIssueLink[];
 
-      if (links.length === 0) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `No links found for **${issueKey}**.`,
-            },
-          ],
-        };
-      }
-
-      const lines = [`**${issueKey}** — ${issue.fields.summary}`, "", "### Links", ""];
-
+      const linkRows: Array<{ type: string; key: string; summary: string; status: string }> = [];
       for (const link of links) {
         if (link.outwardIssue) {
           const oi = link.outwardIssue;
-          lines.push(
-            `- ${link.type.outward} **${oi.key}** ${oi.fields?.summary ?? ""} (*${oi.fields?.status?.name ?? "?"}*)`
-          );
+          linkRows.push({
+            type: link.type.outward,
+            key: oi.key,
+            summary: oi.fields?.summary ?? "",
+            status: oi.fields?.status?.name ?? "?",
+          });
         }
         if (link.inwardIssue) {
           const ii = link.inwardIssue;
-          lines.push(
-            `- ${link.type.inward} **${ii.key}** ${ii.fields?.summary ?? ""} (*${ii.fields?.status?.name ?? "?"}*)`
-          );
+          linkRows.push({
+            type: link.type.inward,
+            key: ii.key,
+            summary: ii.fields?.summary ?? "",
+            status: ii.fields?.status?.name ?? "?",
+          });
         }
       }
-
+      const text = toonLinks(issueKey, issue.fields.summary, linkRows);
       return {
-        content: [{ type: "text" as const, text: lines.join("\n") }],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -108,7 +102,11 @@ export function registerLinkTools(server: McpServer): void {
         content: [
           {
             type: "text" as const,
-            text: `Linked **${inwardIssueKey}** —[${linkType}]→ **${outwardIssueKey}**`,
+            text: toonResult("linked", {
+              linkType,
+              inwardIssueKey,
+              outwardIssueKey,
+            }),
           },
         ],
       };

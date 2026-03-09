@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
+import { toonWatchers, toonResult } from "../formatter/toon.js";
 import type { JiraWatchersResponse } from "../client/types.js";
 
 export function registerWatcherTools(server: McpServer): void {
@@ -24,31 +25,9 @@ export function registerWatcherTools(server: McpServer): void {
         { key: cache.buildKey("watcher", issueKey), entity: "watcher" }
       ) as unknown as JiraWatchersResponse;
 
-      if (data.watchers.length === 0) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `No watchers on **${issueKey}**.`,
-            },
-          ],
-        };
-      }
-
-      const text = data.watchers
-        .map((w) => {
-          const id = w.accountId ?? w.key ?? w.name ?? "";
-          return `- **${w.displayName}** (${id})`;
-        })
-        .join("\n");
-
+      const text = toonWatchers(issueKey, data.watchers, data.watchCount);
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `**${data.watchCount}** watcher(s) on **${issueKey}**:\n\n${text}`,
-          },
-        ],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -83,7 +62,7 @@ export function registerWatcherTools(server: McpServer): void {
         content: [
           {
             type: "text" as const,
-            text: `Added **${accountId}** as watcher on **${issueKey}**.`,
+            text: toonResult("watcher_added", { issueKey, accountId }),
           },
         ],
       };

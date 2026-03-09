@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
+import { toonBoards, toonSprints, toonSprintIssues } from "../formatter/toon.js";
 import type {
   JiraBoard,
   JiraBoardsResponse,
@@ -42,26 +43,9 @@ export function registerSprintTools(server: McpServer): void {
         { key: cache.buildKey("board", "list", type ?? "", projectKeyOrId ?? "", String(maxResults)), entity: "board" }
       ) as unknown as JiraBoardsResponse;
 
-      if (data.values.length === 0) {
-        return {
-          content: [{ type: "text" as const, text: "No boards found." }],
-        };
-      }
-
-      const text = data.values
-        .map(
-          (b: JiraBoard) =>
-            `- **#${b.id}** ${b.name} (${b.type})${b.location?.projectKey ? ` — ${b.location.projectKey}` : ""}`
-        )
-        .join("\n");
-
+      const text = toonBoards(data.values as JiraBoard[]);
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Found **${data.values.length}** board(s):\n\n${text}`,
-          },
-        ],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -88,29 +72,9 @@ export function registerSprintTools(server: McpServer): void {
         { key: cache.buildKey("sprint", String(boardId), state ?? ""), entity: "sprint" }
       ) as unknown as JiraSprintsResponse;
 
-      if (data.values.length === 0) {
-        return {
-          content: [{ type: "text" as const, text: "No sprints found." }],
-        };
-      }
-
-      const text = data.values
-        .map((s: JiraSprint) => {
-          const dates =
-            s.startDate && s.endDate
-              ? ` (${s.startDate.split("T")[0]} → ${s.endDate.split("T")[0]})`
-              : "";
-          return `- **#${s.id}** ${s.name} [${s.state}]${dates}${s.goal ? ` — ${s.goal}` : ""}`;
-        })
-        .join("\n");
-
+      const text = toonSprints(data.values as JiraSprint[]);
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Found **${data.values.length}** sprint(s):\n\n${text}`,
-          },
-        ],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -138,28 +102,9 @@ export function registerSprintTools(server: McpServer): void {
         { key: cache.buildKey("sprint", "issues", String(sprintId), String(maxResults)), entity: "sprint" }
       ) as unknown as JiraSprintIssuesResponse;
 
-      if (data.issues.length === 0) {
-        return {
-          content: [
-            { type: "text" as const, text: "No issues in this sprint." },
-          ],
-        };
-      }
-
-      const text = data.issues
-        .map(
-          (issue: JiraIssue) =>
-            `- **${issue.key}** ${issue.fields.summary} — *${issue.fields.status.name}* (${issue.fields.priority?.name ?? "None"}) [${issue.fields.assignee?.displayName ?? "Unassigned"}]`
-        )
-        .join("\n");
-
+      const text = toonSprintIssues(data.issues as JiraIssue[], data.total);
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Sprint has **${data.total}** issue(s):\n\n${text}`,
-          },
-        ],
+        content: [{ type: "text" as const, text }],
       };
     }
   );

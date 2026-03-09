@@ -4,86 +4,13 @@ import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { adfToMarkdown, markdownToAdf } from "../client/adf-converter.js";
 import { getConfig } from "../config.js";
+import { toonIssue, toonSearchResults, toonResult } from "../formatter/toon.js";
 import type {
   JiraSearchResponse,
   JiraIssue,
   CreateIssuePayload,
   UpdateIssuePayload,
 } from "../client/types.js";
-
-function formatIssue(issue: JiraIssue): string {
-  const f = issue.fields;
-  const client = getClient();
-  const desc =
-    client.isCloud && f.description && typeof f.description === "object"
-      ? adfToMarkdown(f.description)
-      : (f.description as string) ?? "No description";
-
-  const lines = [
-    `## [${issue.key}] ${f.summary}`,
-    "",
-    `| Field | Value |`,
-    `| --- | --- |`,
-    `| Status | ${f.status.name} |`,
-    `| Type | ${f.issuetype.name} |`,
-    `| Priority | ${f.priority?.name ?? "None"} |`,
-    `| Assignee | ${f.assignee?.displayName ?? "Unassigned"} |`,
-    `| Reporter | ${f.reporter?.displayName ?? "Unknown"} |`,
-    `| Labels | ${f.labels?.join(", ") || "None"} |`,
-    `| Created | ${f.created} |`,
-    `| Updated | ${f.updated} |`,
-    `| Resolution | ${f.resolution?.name ?? "Unresolved"} |`,
-    `| Project | ${f.project.key} - ${f.project.name} |`,
-  ];
-
-  if (f.parent) {
-    lines.push(`| Parent | ${f.parent.key} - ${f.parent.fields?.summary ?? ""} |`);
-  }
-
-  if (f.fixVersions?.length) {
-    lines.push(
-      `| Fix Versions | ${f.fixVersions.map((v) => v.name).join(", ")} |`
-    );
-  }
-
-  if (f.components?.length) {
-    lines.push(
-      `| Components | ${f.components.map((c) => c.name).join(", ")} |`
-    );
-  }
-
-  lines.push("", "### Description", "", desc.trim() || "_No description_");
-
-  if (f.comment?.comments?.length) {
-    lines.push("", "### Comments", "");
-    for (const c of f.comment.comments.slice(-5)) {
-      const body =
-        client.isCloud && typeof c.body === "object"
-          ? adfToMarkdown(c.body)
-          : (c.body as string);
-      lines.push(
-        `**${c.author?.displayName ?? "Unknown"}** (${c.created}):`,
-        body.trim(),
-        ""
-      );
-    }
-  }
-
-  return lines.join("\n");
-}
-
-function formatSearchResults(issues: JiraIssue[], total: number): string {
-  if (issues.length === 0) return "No issues found.";
-
-  const lines = [`Found **${total}** issue(s):`, ""];
-  for (const issue of issues) {
-    const f = issue.fields;
-    lines.push(
-      `- **${issue.key}** ${f.summary} — *${f.status.name}* (${f.priority?.name ?? "None"}) [${f.assignee?.displayName ?? "Unassigned"}]`
-    );
-  }
-  return lines.join("\n");
-}
 
 export function registerIssueTools(server: McpServer): void {
   const config = getConfig();
@@ -127,18 +54,14 @@ export function registerIssueTools(server: McpServer): void {
         maxResults,
       });
 
-      let text = formatSearchResults(data.issues, data.total);
-      if (data.nextPageToken) {
-        text += "\n\n_More results available._";
-      }
+      const text = toonSearchResults(
+        data.issues,
+        data.total,
+        data.nextPageToken
+      );
 
       return {
-        content: [
-          {
-            type: "text" as const,
-            text,
-          },
-        ],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -158,15 +81,28 @@ export function registerIssueTools(server: McpServer): void {
       },
     },
     async ({ issueKey }) => {
-      const issue = await getClient().getIssue(issueKey, [
+      const client = getClient();
+      const issue = await client.getIssue(issueKey, [
         "summary", "status", "priority", "assignee", "reporter",
         "issuetype", "description", "labels", "comment", "created",
         "updated", "resolution", "fixVersions", "components",
         "project", "parent", "subtasks",
       ]);
+      const desc =
+        client.isCloud && issue.fields.description && typeof issue.fields.description === "object"
+          ? adfToMarkdown(issue.fields.description)
+          : (issue.fields.description as string) ?? "";
+      const comments = issue.fields.comment?.comments?.slice(-5).map((c) => ({
+        author: c.author?.displayName ?? "Unknown",
+        created: c.created,
+        body:
+          client.isCloud && typeof c.body === "object"
+            ? adfToMarkdown(c.body)
+            : (c.body as string) ?? "",
+      }));
 
       return {
-        content: [{ type: "text" as const, text: formatIssue(issue) }],
+        content: [{ type: "text" as const, text: toonIssue(issue, desc, comments) }],
       };
     }
   );
@@ -234,7 +170,7 @@ export function registerIssueTools(server: McpServer): void {
           content: [
             {
               type: "text" as const,
-              text: "Error: project key is required. Set JIRA_DEFAULT_PROJECT or pass `project`.",
+              text: toonResult("error", { message: "project key required. Set JIRA_DEFAULT_PROJECT or pass project" }),
             },
           ],
           isError: true,
@@ -282,7 +218,10 @@ export function registerIssueTools(server: McpServer): void {
         content: [
           {
             type: "text" as const,
-            text: `Issue **${result.key}** created successfully.\n\nURL: ${client.baseUrl}/browse/${result.key}`,
+            text: toonResult("created", {
+              issueKey: result.key,
+              url: `${client.baseUrl}/browse/${result.key}`,
+            }),
           },
         ],
       };
@@ -349,7 +288,7 @@ export function registerIssueTools(server: McpServer): void {
         content: [
           {
             type: "text" as const,
-            text: `Issue **${issueKey}** updated successfully.`,
+            text: toonResult("updated", { issueKey }),
           },
         ],
       };
@@ -384,7 +323,7 @@ export function registerIssueTools(server: McpServer): void {
         content: [
           {
             type: "text" as const,
-            text: `Issue **${issueKey}** deleted permanently.`,
+            text: toonResult("deleted", { issueKey }),
           },
         ],
       };

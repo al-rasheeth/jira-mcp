@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
+import { toonUsers, toonResult } from "../formatter/toon.js";
 import type { JiraUser } from "../client/types.js";
 
 export function registerUserTools(server: McpServer): void {
@@ -29,28 +30,9 @@ export function registerUserTools(server: McpServer): void {
         { key: cache.buildKey("user", query, String(maxResults)), entity: "user" }
       ) as unknown as JiraUser[];
 
-      if (users.length === 0) {
-        return {
-          content: [
-            { type: "text" as const, text: `No users matching "${query}".` },
-          ],
-        };
-      }
-
-      const text = users
-        .map((u) => {
-          const id = u.accountId ?? u.key ?? u.name ?? "unknown";
-          return `- **${u.displayName}** (${id})${u.emailAddress ? ` — ${u.emailAddress}` : ""}`;
-        })
-        .join("\n");
-
+      const text = toonUsers(users);
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Found **${users.length}** user(s):\n\n${text}`,
-          },
-        ],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -88,15 +70,14 @@ export function registerUserTools(server: McpServer): void {
 
       getCache().invalidateIssue(issueKey);
 
-      const assignText = assigneeId
-        ? `assigned to **${assigneeId}**`
-        : "unassigned";
-
       return {
         content: [
           {
             type: "text" as const,
-            text: `Issue **${issueKey}** ${assignText}.`,
+            text: toonResult("assigned", {
+              issueKey,
+              assigneeId: assigneeId ?? null,
+            }),
           },
         ],
       };

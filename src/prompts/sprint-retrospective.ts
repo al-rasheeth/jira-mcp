@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
+import { toonSprintRetroContext } from "../formatter/toon.js";
 import type {
   JiraSprint,
   JiraSprintIssuesResponse,
@@ -61,64 +62,39 @@ export function registerSprintRetrospectivePrompt(server: McpServer): void {
           ? Math.round((completed.length / issues.length) * 100)
           : 0;
 
-      const formatIssueList = (list: JiraIssue[]) =>
-        list.length === 0
-          ? "_None_"
-          : list
-              .map(
-                (i) =>
-                  `- **${i.key}** ${i.fields.summary} (${i.fields.issuetype.name}, ${i.fields.priority?.name ?? "None"}) [${i.fields.assignee?.displayName ?? "Unassigned"}]`
-              )
-              .join("\n");
+      const toIssue = (i: JiraIssue) => ({
+        key: i.key,
+        summary: i.fields.summary,
+        type: i.fields.issuetype.name,
+        priority: i.fields.priority?.name ?? "None",
+        assignee: i.fields.assignee?.displayName ?? "Unassigned",
+      });
 
       const assigneeStats = Object.entries(byAssignee)
         .sort(([, a], [, b]) => b.done + b.notDone - (a.done + a.notDone))
-        .map(
-          ([name, stats]) => {
-            const total = stats.done + stats.notDone;
-            const rate = total > 0 ? Math.round((stats.done / total) * 100) : 0;
-            return `- ${name}: ${stats.done} done, ${stats.notDone} not done (${rate}% rate)`;
-          }
-        )
-        .join("\n");
+        .map(([name, stats]) => {
+          const total = stats.done + stats.notDone;
+          const rate = total > 0 ? Math.round((stats.done / total) * 100) : 0;
+          return { name, done: stats.done, notDone: stats.notDone, rate };
+        });
 
-      const typeStats = Object.entries(byType)
-        .map(
-          ([type, stats]) =>
-            `- ${type}: ${stats.done} done, ${stats.notDone} not done`
-        )
-        .join("\n");
-
-      const context = [
-        `## Sprint: ${sprint.name}`,
-        `- **State**: ${sprint.state}`,
-        sprint.startDate
-          ? `- **Start**: ${sprint.startDate.split("T")[0]}`
-          : null,
-        sprint.endDate
-          ? `- **End**: ${sprint.endDate.split("T")[0]}`
-          : null,
-        sprint.completeDate
-          ? `- **Completed**: ${sprint.completeDate.split("T")[0]}`
-          : null,
-        sprint.goal ? `- **Goal**: ${sprint.goal}` : null,
-        "",
-        `## Results: **${completionRate}%** completion (${completed.length}/${issues.length})`,
-        "",
-        "### Completed Issues",
-        formatIssueList(completed),
-        "",
-        "### Incomplete / Carried Over",
-        formatIssueList(incomplete),
-        "",
-        "### By Assignee",
-        assigneeStats,
-        "",
-        "### By Type",
-        typeStats,
-      ]
-        .filter(Boolean)
-        .join("\n");
+      const context = toonSprintRetroContext({
+        sprint: {
+          name: sprint.name,
+          state: sprint.state,
+          startDate: sprint.startDate?.split("T")[0],
+          endDate: sprint.endDate?.split("T")[0],
+          completeDate: sprint.completeDate?.split("T")[0],
+          goal: sprint.goal ?? undefined,
+        },
+        completionRate,
+        completedCount: completed.length,
+        totalCount: issues.length,
+        completed: completed.map(toIssue),
+        incomplete: incomplete.map(toIssue),
+        byAssignee: assigneeStats,
+        byType,
+      });
 
       return {
         messages: [
@@ -128,12 +104,12 @@ export function registerSprintRetrospectivePrompt(server: McpServer): void {
               type: "text" as const,
               text: `You are a scrum master facilitating a sprint retrospective. Analyze this sprint and provide:
 
-1. **Sprint Summary**: What was the sprint about and did it meet its goal?
-2. **What Went Well**: Highlight completed work, on-time delivery, good patterns
-3. **What Didn't Go Well**: Incomplete items, patterns of failure, overcommitment signals
-4. **Velocity Analysis**: Completion rate by assignee and type — who delivered, where were gaps
-5. **Carry-Over Impact**: Assess the incomplete items — are they blockers? Should they be re-prioritized?
-6. **Action Items**: 3-5 concrete improvement suggestions for the next sprint
+1. Sprint Summary: What was the sprint about and did it meet its goal?
+2. What Went Well: Highlight completed work, on-time delivery, good patterns
+3. What Didn't Go Well: Incomplete items, patterns of failure, overcommitment signals
+4. Velocity Analysis: Completion rate by assignee and type — who delivered, where were gaps
+5. Carry-Over Impact: Assess the incomplete items — are they blockers? Should they be re-prioritized?
+6. Action Items: 3-5 concrete improvement suggestions for the next sprint
 
 ${context}`,
             },

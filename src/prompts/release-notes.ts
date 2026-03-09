@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
-import type { JiraSearchResponse } from "../client/types.js";
+import { toonReleaseNotesContext } from "../formatter/toon.js";
 
 export function registerReleaseNotesPrompt(server: McpServer): void {
   server.registerPrompt(
@@ -37,18 +37,22 @@ export function registerReleaseNotesPrompt(server: McpServer): void {
         ],
       });
 
-      const issuesByType: Record<string, string[]> = {};
+      const issuesByType: Record<string, Array<{ key: string; summary: string; priority: string }>> = {};
       for (const issue of data.issues) {
         const typeName = issue.fields.issuetype.name;
         if (!issuesByType[typeName]) issuesByType[typeName] = [];
-        issuesByType[typeName].push(
-          `- **${issue.key}**: ${issue.fields.summary} (${issue.fields.priority?.name ?? "None"})`
-        );
+        issuesByType[typeName].push({
+          key: issue.key,
+          summary: issue.fields.summary,
+          priority: issue.fields.priority?.name ?? "None",
+        });
       }
 
-      const groupedText = Object.entries(issuesByType)
-        .map(([type, items]) => `### ${type}\n${items.join("\n")}`)
-        .join("\n\n");
+      const context = toonReleaseNotesContext({
+        version,
+        issuesByType,
+        total: data.total,
+      });
 
       return {
         messages: [
@@ -58,18 +62,14 @@ export function registerReleaseNotesPrompt(server: McpServer): void {
               type: "text" as const,
               text: `You are a technical writer. Generate professional release notes from the following JIRA issues. Format them in a user-friendly way suitable for sharing with stakeholders.
 
-${version ? `**Version: ${version}**` : ""}
-
 Include:
-1. **Summary**: A high-level overview of the release
-2. **New Features**: Group features and improvements
-3. **Bug Fixes**: List fixed bugs
-4. **Breaking Changes**: Flag any if apparent
-5. **Known Issues**: Mention any unresolved items if relevant
+1. Summary: A high-level overview of the release
+2. New Features: Group features and improvements
+3. Bug Fixes: List fixed bugs
+4. Breaking Changes: Flag any if apparent
+5. Known Issues: Mention any unresolved items if relevant
 
-## Issues (${data.total} total)
-
-${groupedText}`,
+${context}`,
             },
           },
         ],

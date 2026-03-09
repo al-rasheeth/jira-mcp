@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
+import { toonMyself } from "../formatter/toon.js";
 import type { JiraMyself } from "../client/types.js";
 
 export function registerMyselfResources(server: McpServer): void {
@@ -10,7 +11,7 @@ export function registerMyselfResources(server: McpServer): void {
     {
       title: "Current User",
       description: "The currently authenticated JIRA user",
-      mimeType: "text/markdown",
+      mimeType: "text/plain",
     },
     async (uri) => {
       const client = getClient();
@@ -24,25 +25,9 @@ export function registerMyselfResources(server: McpServer): void {
         cache
       )) as unknown as JiraMyself;
 
-      const lines = [
-        "# Current JIRA User",
-        "",
-        `- **Name**: ${me.displayName}`,
-        `- **Email**: ${me.emailAddress ?? "N/A"}`,
-        `- **Account ID**: ${me.accountId ?? me.key ?? "N/A"}`,
-        `- **Active**: ${me.active ? "Yes" : "No"}`,
-        `- **Timezone**: ${me.timeZone ?? "N/A"}`,
-        `- **Locale**: ${me.locale ?? "N/A"}`,
-      ];
-
-      if (me.groups?.items?.length) {
-        lines.push(
-          `- **Groups**: ${me.groups.items.map((g) => g.name).join(", ")}`
-        );
-      }
-
+      const text = toonMyself(me);
       return {
-        contents: [{ uri: uri.href, mimeType: "text/markdown", text: lines.join("\n") }],
+        contents: [{ uri: uri.href, mimeType: "text/plain", text }],
       };
     }
   );

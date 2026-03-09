@@ -3,6 +3,7 @@ import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { adfToMarkdown } from "../client/adf-converter.js";
+import { toonIssue } from "../formatter/toon.js";
 import type { JiraIssue } from "../client/types.js";
 
 const ISSUE_FIELDS = [
@@ -33,7 +34,7 @@ export function registerIssueResources(server: McpServer): void {
     {
       title: "JIRA Issue",
       description: "Detailed view of a single JIRA issue by key",
-      mimeType: "text/markdown",
+      mimeType: "text/plain",
     },
     async (uri, { issueKey }) => {
       const client = getClient();
@@ -50,51 +51,23 @@ export function registerIssueResources(server: McpServer): void {
       const desc =
         client.isCloud && f.description && typeof f.description === "object"
           ? adfToMarkdown(f.description)
-          : (f.description as string) ?? "_No description_";
+          : (f.description as string) ?? "";
+      const comments = f.comment?.comments?.map((c) => ({
+        author: c.author?.displayName ?? "Unknown",
+        created: c.created,
+        body:
+          client.isCloud && typeof c.body === "object"
+            ? adfToMarkdown(c.body)
+            : (c.body as string) ?? "",
+      }));
 
-      const lines = [
-        `# [${issue.key}] ${f.summary}`,
-        "",
-        "| Field | Value |",
-        "| --- | --- |",
-        `| Status | ${f.status.name} |`,
-        `| Type | ${f.issuetype.name} |`,
-        `| Priority | ${f.priority?.name ?? "None"} |`,
-        `| Assignee | ${f.assignee?.displayName ?? "Unassigned"} |`,
-        `| Reporter | ${f.reporter?.displayName ?? "Unknown"} |`,
-        `| Labels | ${f.labels?.join(", ") || "None"} |`,
-        `| Created | ${f.created} |`,
-        `| Updated | ${f.updated} |`,
-        `| Resolution | ${f.resolution?.name ?? "Unresolved"} |`,
-        `| Project | ${f.project.key} — ${f.project.name} |`,
-        "",
-        "## Description",
-        "",
-        desc.trim() || "_No description_",
-      ];
-
-      if (f.comment?.comments?.length) {
-        lines.push("", "## Comments", "");
-        for (const c of f.comment.comments) {
-          const body =
-            client.isCloud && typeof c.body === "object"
-              ? adfToMarkdown(c.body)
-              : (c.body as string);
-          lines.push(
-            `### ${c.author?.displayName ?? "Unknown"} — ${c.created}`,
-            "",
-            body.trim(),
-            ""
-          );
-        }
-      }
-
+      const text = toonIssue(issue, desc, comments);
       return {
         contents: [
           {
             uri: uri.href,
-            mimeType: "text/markdown",
-            text: lines.join("\n"),
+            mimeType: "text/plain",
+            text,
           },
         ],
       };

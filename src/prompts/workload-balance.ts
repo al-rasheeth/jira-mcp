@@ -2,7 +2,8 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getConfig } from "../config.js";
-import type { JiraSearchResponse, JiraIssue } from "../client/types.js";
+import { toonWorkloadContext, toonResult } from "../formatter/toon.js";
+import type { JiraIssue } from "../client/types.js";
 
 export function registerWorkloadBalancePrompt(server: McpServer): void {
   const config = getConfig();
@@ -31,7 +32,7 @@ export function registerWorkloadBalancePrompt(server: McpServer): void {
               role: "user" as const,
               content: {
                 type: "text" as const,
-                text: "Error: project key is required. Set JIRA_DEFAULT_PROJECT or provide `project`.",
+                text: toonResult("error", { message: "project key required" }),
               },
             },
           ],
@@ -97,41 +98,31 @@ export function registerWorkloadBalancePrompt(server: McpServer): void {
       const avgLoad =
         assignedMemberCount > 0 ? Math.round(total / assignedMemberCount) : 0;
 
-      const memberDetails = Object.entries(byAssignee)
+      const byMember = Object.entries(byAssignee)
         .sort(([, a], [, b]) => b.issues.length - a.issues.length)
         .map(([name, data]) => {
           const highPri =
             (data.byPriority["Highest"] ?? 0) +
             (data.byPriority["High"] ?? 0) +
             (data.byPriority["Critical"] ?? 0);
-          const priBreakdown = Object.entries(data.byPriority)
-            .map(([k, v]) => `${k}: ${v}`)
-            .join(", ");
-          const statusBreakdown = Object.entries(data.byStatus)
-            .map(([k, v]) => `${k}: ${v}`)
-            .join(", ");
-          return [
-            `### ${name} — **${data.issues.length}** open issues${highPri > 0 ? ` (${highPri} high-priority)` : ""}`,
-            `- Priority: ${priBreakdown}`,
-            `- Status: ${statusBreakdown}`,
-            `- Issues: ${data.issues.map((i) => i.key).join(", ")}`,
-          ].join("\n");
-        })
-        .join("\n\n");
+          return {
+            name,
+            issueCount: data.issues.length,
+            highPriCount: highPri,
+            byPriority: data.byPriority,
+            byStatus: data.byStatus,
+            issueKeys: data.issues.map((i) => i.key),
+          };
+        });
 
-      const context = [
-        `## Workload Analysis: ${projectKey}`,
-        `- **Total open issues**: ${total}`,
-        `- **Team members with work**: ${Object.keys(byAssignee).filter((n) => n !== "Unassigned").length}`,
-        `- **Average load**: ~${avgLoad} issues/person`,
-        byAssignee["Unassigned"]
-          ? `- **Unassigned issues**: ${byAssignee["Unassigned"].issues.length}`
-          : null,
-        "",
-        memberDetails,
-      ]
-        .filter(Boolean)
-        .join("\n");
+      const context = toonWorkloadContext({
+        projectKey,
+        totalOpen: total,
+        teamMemberCount: assignedMemberCount,
+        avgLoad,
+        unassignedCount: byAssignee["Unassigned"]?.issues.length ?? 0,
+        byMember,
+      });
 
       return {
         messages: [
@@ -141,11 +132,11 @@ export function registerWorkloadBalancePrompt(server: McpServer): void {
               type: "text" as const,
               text: `You are a team lead analyzing workload distribution. Provide:
 
-1. **Balance Assessment**: Is work evenly distributed? Who is overloaded vs underutilized?
-2. **Risk Identification**: Team members with too many high-priority items, single points of failure
-3. **Unassigned Work**: Triage the unassigned issues — who should pick them up?
-4. **Bottleneck Detection**: Any patterns indicating bottlenecks (too many in-progress, blocked items)?
-5. **Rebalancing Recommendations**: Specific suggestions to redistribute work more effectively
+1. Balance Assessment: Is work evenly distributed? Who is overloaded vs underutilized?
+2. Risk Identification: Team members with too many high-priority items, single points of failure
+3. Unassigned Work: Triage the unassigned issues — who should pick them up?
+4. Bottleneck Detection: Any patterns indicating bottlenecks (too many in-progress, blocked items)?
+5. Rebalancing Recommendations: Specific suggestions to redistribute work more effectively
 
 ${context}`,
             },

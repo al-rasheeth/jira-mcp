@@ -2,9 +2,9 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { adfToMarkdown } from "../client/adf-converter.js";
+import { toonEpicDevPlanContext } from "../formatter/toon.js";
 import type {
   JiraIssue,
-  JiraSearchResponse,
   JiraComment,
   JiraIssueLink,
   AdfDocument,
@@ -23,58 +23,6 @@ function convertBody(
   if (!body) return "";
   if (isCloud && typeof body === "object") return adfToMarkdown(body);
   return typeof body === "string" ? body : "";
-}
-
-function formatIssueDeep(
-  issue: JiraIssue,
-  isCloud: boolean
-): { text: string; figmaUrls: string[] } {
-  const f = issue.fields;
-  const desc = convertBody(f.description, isCloud);
-  const figmaUrls = extractFigmaUrls(desc);
-
-  const lines = [
-    `### ${issue.key} — ${f.summary}`,
-    "",
-    `| Field | Value |`,
-    `| --- | --- |`,
-    `| Type | ${f.issuetype.name} |`,
-    `| Status | ${f.status.name} (${f.status.statusCategory.key}) |`,
-    `| Priority | ${f.priority?.name ?? "None"} |`,
-    `| Assignee | ${f.assignee?.displayName ?? "Unassigned"} |`,
-    `| Labels | ${f.labels?.join(", ") || "None"} |`,
-    `| Components | ${(f.components ?? []).map((c) => c.name).join(", ") || "None"} |`,
-  ];
-
-  const issueLinks = (f.issuelinks ?? []) as JiraIssueLink[];
-  if (issueLinks.length > 0) {
-    const linkStrs = issueLinks.map((l) => {
-      if (l.outwardIssue) return `${l.type.outward} ${l.outwardIssue.key}`;
-      if (l.inwardIssue) return `${l.type.inward} ${l.inwardIssue.key}`;
-      return "";
-    }).filter(Boolean);
-    if (linkStrs.length) {
-      lines.push(`| Links | ${linkStrs.join("; ")} |`);
-    }
-  }
-
-  lines.push("", "**Description:**", "", desc.trim() || "_No description_");
-
-  const comments = (f.comment?.comments ?? []) as JiraComment[];
-  if (comments.length > 0) {
-    const recent = comments.slice(-3);
-    lines.push("", "**Recent Comments:**", "");
-    for (const c of recent) {
-      const body = convertBody(c.body, isCloud);
-      figmaUrls.push(...extractFigmaUrls(body));
-      lines.push(
-        `> **${c.author?.displayName ?? "Unknown"}** (${c.created.split("T")[0]}): ${body.trim().slice(0, 500)}`,
-        ""
-      );
-    }
-  }
-
-  return { text: lines.join("\n"), figmaUrls };
 }
 
 export function registerEpicDevPlanPrompt(server: McpServer): void {
@@ -134,68 +82,94 @@ export function registerEpicDevPlanPrompt(server: McpServer): void {
       const epicDesc = convertBody(ef.description, client.isCloud);
       const epicFigmaUrls = extractFigmaUrls(epicDesc);
 
-      const allFigmaUrls: Map<string, string[]> = new Map();
-      if (epicFigmaUrls.length > 0) {
-        allFigmaUrls.set(epicKey, epicFigmaUrls);
+      const figmaUrls: Array<{ ticketKey: string; url: string }> = [];
+      for (const url of epicFigmaUrls) {
+        figmaUrls.push({ ticketKey: epicKey, url });
       }
 
-      const issueBlocks: string[] = [];
+      const childIssues: Array<{
+        key: string;
+        summary: string;
+        type: string;
+        status: string;
+        priority: string;
+        assignee: string;
+        labels: string;
+        components: string;
+        links?: string[];
+        description: string;
+        recentComments: Array<{ author: string; date: string; body: string }>;
+      }> = [];
       let doneCount = 0;
-      let totalCount = childData.total;
+      const totalCount = childData.total;
 
       for (const issue of childData.issues) {
         if (issue.fields.status.statusCategory.key === "done") doneCount++;
 
-        const { text, figmaUrls } = formatIssueDeep(issue, client.isCloud);
-        issueBlocks.push(text);
-
-        if (figmaUrls.length > 0) {
-          allFigmaUrls.set(issue.key, figmaUrls);
+        const f = issue.fields;
+        const desc = convertBody(f.description, client.isCloud);
+        const issueFigmaUrls = extractFigmaUrls(desc);
+        for (const url of issueFigmaUrls) {
+          figmaUrls.push({ ticketKey: issue.key, url });
         }
+
+        const issueLinks = (f.issuelinks ?? []) as JiraIssueLink[];
+        const linkStrs = issueLinks
+          .map((l) => {
+            if (l.outwardIssue) return `${l.type.outward} ${l.outwardIssue.key}`;
+            if (l.inwardIssue) return `${l.type.inward} ${l.inwardIssue.key}`;
+            return "";
+          })
+          .filter(Boolean);
+
+        const comments = (f.comment?.comments ?? []) as JiraComment[];
+        const recentComments = comments.slice(-3).map((c) => ({
+          author: c.author?.displayName ?? "Unknown",
+          date: c.created.split("T")[0],
+          body: convertBody(c.body, client.isCloud).trim().slice(0, 500),
+        }));
+        for (const c of recentComments) {
+          for (const url of extractFigmaUrls(c.body)) {
+            figmaUrls.push({ ticketKey: issue.key, url });
+          }
+        }
+
+        childIssues.push({
+          key: issue.key,
+          summary: f.summary,
+          type: f.issuetype.name,
+          status: f.status.name,
+          priority: f.priority?.name ?? "None",
+          assignee: f.assignee?.displayName ?? "Unassigned",
+          labels: f.labels?.join(", ") || "None",
+          components: (f.components ?? []).map((c) => c.name).join(", ") || "None",
+          links: linkStrs.length ? linkStrs : undefined,
+          description: desc.trim() || "",
+          recentComments,
+        });
       }
 
       const completionPct =
         totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 
-      // Build Figma references section
-      let figmaSection = "";
-      if (allFigmaUrls.size > 0) {
-        const figmaLines = ["## Figma Design References", ""];
-        for (const [key, urls] of allFigmaUrls) {
-          for (const url of urls) {
-            figmaLines.push(`- **${key}**: ${url}`);
-          }
-        }
-        figmaSection = figmaLines.join("\n");
-      }
-
-      const context = [
-        `## Epic: [${epicKey}] ${ef.summary}`,
-        `- **Project**: ${ef.project.key} — ${ef.project.name}`,
-        `- **Status**: ${ef.status.name}`,
-        `- **Priority**: ${ef.priority?.name ?? "None"}`,
-        `- **Assignee**: ${ef.assignee?.displayName ?? "Unassigned"}`,
-        `- **Labels**: ${ef.labels?.join(", ") || "None"}`,
-        ef.components?.length
-          ? `- **Components**: ${ef.components.map((c) => c.name).join(", ")}`
-          : null,
-        ef.fixVersions?.length
-          ? `- **Fix Versions**: ${ef.fixVersions.map((v) => v.name).join(", ")}`
-          : null,
-        `- **Progress**: ${completionPct}% (${doneCount}/${totalCount})`,
-        "",
-        "### Epic Description",
-        "",
-        epicDesc.trim() || "_No description_",
-        "",
-        figmaSection,
-        "",
-        `## Child Issues (${childData.issues.length} of ${totalCount})`,
-        "",
-        ...issueBlocks,
-      ]
-        .filter((line) => line !== null)
-        .join("\n");
+      const context = toonEpicDevPlanContext({
+        epic: {
+          key: epicKey,
+          summary: ef.summary,
+          project: `${ef.project.key} — ${ef.project.name}`,
+          status: ef.status.name,
+          priority: ef.priority?.name ?? "None",
+          assignee: ef.assignee?.displayName ?? "Unassigned",
+          labels: ef.labels?.join(", ") || "None",
+          components: ef.components?.length ? ef.components.map((c) => c.name).join(", ") : undefined,
+          fixVersions: ef.fixVersions?.length ? ef.fixVersions.map((v) => v.name).join(", ") : undefined,
+          progress: `${completionPct}% (${doneCount}/${totalCount})`,
+          description: epicDesc.trim() || "",
+        },
+        figmaUrls,
+        childIssues,
+        totalCount,
+      });
 
       const platformLabel: Record<string, string> = {
         web: "Web Frontend (React, Vue, Angular, HTML/CSS/JS)",
@@ -208,15 +182,15 @@ export function registerEpicDevPlanPrompt(server: McpServer): void {
       };
 
       const intentClause = intent
-        ? `\n\n**User Intent**: "${intent}" — Honor this directive. Use it to prioritize, filter, or focus the plan as instructed.`
+        ? `\n\nUser Intent: "${intent}" — Honor this directive. Use it to prioritize, filter, or focus the plan as instructed.`
         : "";
 
-      const figmaInstruction = allFigmaUrls.size > 0
+      const figmaInstruction = figmaUrls.length > 0
         ? `
 
-**Figma Designs Found**: The issues above contain Figma URLs. Before building the implementation plan:
+Figma Designs Found: The issues contain Figma URLs. Before building the implementation plan:
 1. List each Figma URL with its associated ticket
-2. Instruct the developer to use the figma-mcp tools (\`get_figma_data\`) to fetch these designs for visual reference, component inventory, and spacing/typography specs
+2. Instruct the developer to use the figma-mcp tools (get_figma_data) to fetch these designs for visual reference, component inventory, and spacing/typography specs
 3. Reference specific Figma frames in the per-ticket implementation notes where applicable`
         : "";
 
@@ -228,7 +202,7 @@ export function registerEpicDevPlanPrompt(server: McpServer): void {
               type: "text" as const,
               text: `You are a senior software architect generating an actionable development plan from JIRA epic data.
 
-**Target Platform**: ${platform} — ${platformLabel[platform] ?? platform}${intentClause}${figmaInstruction}
+Target Platform: ${platform} — ${platformLabel[platform] ?? platform}${intentClause}${figmaInstruction}
 
 Analyze ALL the tickets below and produce the following:
 
@@ -241,7 +215,7 @@ From the full list of child issues, categorize each ticket:
 - **Cross-platform dependency**: tickets on OTHER platforms that this platform depends on (e.g., a web ticket needing an API endpoint)
 - **Not relevant**: tickets clearly for other platforms
 
-For each ticket, state: \`TICKET_KEY — Relevant | Dependency | Excluded — reason\`
+For each ticket, state: TICKET_KEY — Relevant | Dependency | Excluded — reason
 
 ---
 

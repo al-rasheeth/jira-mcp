@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getConfig } from "../config.js";
-import type { JiraSearchResponse } from "../client/types.js";
+import { toonStandupContext, toonResult } from "../formatter/toon.js";
 
 export function registerStandupSummaryPrompt(server: McpServer): void {
   const config = getConfig();
@@ -38,7 +38,7 @@ export function registerStandupSummaryPrompt(server: McpServer): void {
               role: "user" as const,
               content: {
                 type: "text" as const,
-                text: "Error: project key is required. Set JIRA_DEFAULT_PROJECT or provide `project`.",
+                text: toonResult("error", { message: "project key required" }),
               },
             },
           ],
@@ -71,28 +71,20 @@ export function registerStandupSummaryPrompt(server: McpServer): void {
         (i) => i.fields.status.statusCategory.key === "new"
       );
 
-      const formatList = (issues: typeof recentlyUpdated.issues) =>
-        issues.length === 0
-          ? "_None_"
-          : issues
-              .map(
-                (i) =>
-                  `- **${i.key}** ${i.fields.summary} (${i.fields.assignee?.displayName ?? "Unassigned"})`
-              )
-              .join("\n");
+      const toList = (issues: typeof recentlyUpdated.issues) =>
+        issues.map((i) => ({
+          key: i.key,
+          summary: i.fields.summary,
+          assignee: i.fields.assignee?.displayName ?? "Unassigned",
+        }));
 
-      const context = [
-        `## Project: ${projectKey} (last ${daysBack} day(s))`,
-        "",
-        `### In Progress (${inProgress.length})`,
-        formatList(inProgress),
-        "",
-        `### Recently Completed (${done.length})`,
-        formatList(done),
-        "",
-        `### To Do / Updated (${todo.length})`,
-        formatList(todo),
-      ].join("\n");
+      const context = toonStandupContext({
+        projectKey,
+        daysBack,
+        inProgress: toList(inProgress),
+        done: toList(done),
+        todo: toList(todo),
+      });
 
       return {
         messages: [
@@ -102,10 +94,10 @@ export function registerStandupSummaryPrompt(server: McpServer): void {
               type: "text" as const,
               text: `You are a scrum master assistant. Generate a concise daily standup summary from this JIRA data. Structure it as:
 
-1. **What was completed** (done items)
-2. **What is in progress** (active work)
-3. **What's coming up** (to-do items with recent updates)
-4. **Blockers or concerns** (high priority items stuck, unassigned work, etc.)
+1. What was completed (done items)
+2. What is in progress (active work)
+3. What's coming up (to-do items with recent updates)
+4. Blockers or concerns (high priority items stuck, unassigned work, etc.)
 
 Keep it brief and actionable, suitable for a 5-minute standup.
 

@@ -4,10 +4,10 @@ import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
 import { adfToMarkdown } from "../client/adf-converter.js";
+import { toonWorklogs, toonResult } from "../formatter/toon.js";
 import type {
   JiraWorklog,
   JiraWorklogsResponse,
-  AddWorklogPayload,
 } from "../client/types.js";
 
 export function registerWorklogTools(server: McpServer): void {
@@ -30,41 +30,27 @@ export function registerWorklogTools(server: McpServer): void {
         return result as unknown as JiraWorklogsResponse;
       }, { key: cache.buildKey("worklog", issueKey, String(maxResults)), entity: "worklog" });
 
-      if (data.worklogs.length === 0) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `No worklogs on **${issueKey}**.`,
-            },
-          ],
-        };
-      }
-
       const totalSeconds = data.worklogs.reduce(
         (sum, w) => sum + w.timeSpentSeconds,
         0
       );
       const totalHours = (totalSeconds / 3600).toFixed(1);
-
-      const lines = [
-        `**${data.total}** worklog(s) on **${issueKey}** (total: **${totalHours}h**):`,
-        "",
-      ];
-
-      for (const w of data.worklogs) {
-        const comment = w.comment
+      const bodyTexts = data.worklogs.map((w) =>
+        w.comment
           ? typeof w.comment === "object"
             ? adfToMarkdown(w.comment).trim()
-            : w.comment
-          : "";
-        lines.push(
-          `- **${w.author.displayName}** — ${w.timeSpent} on ${w.started.split("T")[0]}${comment ? ` — _${comment.slice(0, 80)}_` : ""}`
-        );
-      }
-
+            : (w.comment as string)
+          : ""
+      );
+      const text = toonWorklogs(
+        issueKey,
+        data.worklogs,
+        data.total,
+        totalHours,
+        bodyTexts
+      );
       return {
-        content: [{ type: "text" as const, text: lines.join("\n") }],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -137,7 +123,11 @@ export function registerWorklogTools(server: McpServer): void {
         content: [
           {
             type: "text" as const,
-            text: `Worklog added to **${issueKey}**: ${result.timeSpent} (ID: ${result.id})`,
+            text: toonResult("worklog_added", {
+              issueKey,
+              timeSpent: result.timeSpent,
+              id: result.id,
+            }),
           },
         ],
       };

@@ -2,18 +2,8 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
+import { toonProject, toonProjects } from "../formatter/toon.js";
 import type { JiraProject } from "../client/types.js";
-
-function formatProject(p: JiraProject): string {
-  return [
-    `### ${p.key} — ${p.name}`,
-    "",
-    p.description ? p.description.trim() : "_No description_",
-    "",
-    `- **Type**: ${p.projectTypeKey ?? "unknown"}`,
-    `- **Lead**: ${p.lead?.displayName ?? "None"}`,
-  ].join("\n");
-}
 
 export function registerProjectTools(server: McpServer): void {
   server.registerTool(
@@ -42,26 +32,9 @@ export function registerProjectTools(server: McpServer): void {
 
       const projects = raw.values ?? [];
 
-      if (projects.length === 0) {
-        return {
-          content: [{ type: "text" as const, text: "No projects found." }],
-        };
-      }
-
-      const text = projects
-        .map(
-          (p) =>
-            `- **${p.key}** — ${p.name} (${p.projectTypeKey ?? "unknown"})`
-        )
-        .join("\n");
-
+      const text = toonProjects(projects);
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Found **${projects.length}** project(s):\n\n${text}`,
-          },
-        ],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -88,7 +61,7 @@ export function registerProjectTools(server: McpServer): void {
       );
 
       return {
-        content: [{ type: "text" as const, text: formatProject(project) }],
+        content: [{ type: "text" as const, text: toonProject(project) }],
       };
     }
   );

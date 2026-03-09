@@ -3,10 +3,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
 import { getConfig } from "../config.js";
+import { toonEpics, toonEpicDetail, toonResult } from "../formatter/toon.js";
 import type {
   JiraEpic,
   JiraEpicsResponse,
-  JiraEpicIssuesResponse,
   JiraIssue,
 } from "../client/types.js";
 
@@ -35,26 +35,9 @@ export function registerEpicTools(server: McpServer): void {
         { key: cache.buildKey("epic", "list", String(boardId), String(done ?? ""), String(maxResults)), entity: "epic" }
       ) as unknown as JiraEpicsResponse;
 
-      if (data.values.length === 0) {
-        return {
-          content: [{ type: "text" as const, text: "No epics found." }],
-        };
-      }
-
-      const text = data.values
-        .map(
-          (e: JiraEpic) =>
-            `- **${e.key}** ${e.name ?? e.summary} ${e.done ? "~~done~~" : "[active]"}`
-        )
-        .join("\n");
-
+      const text = toonEpics(data.values as JiraEpic[]);
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Found **${data.values.length}** epic(s):\n\n${text}`,
-          },
-        ],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -119,50 +102,32 @@ export function registerEpicTools(server: McpServer): void {
         byAssignee[assigneeName] = (byAssignee[assigneeName] ?? 0) + 1;
       }
 
-      const completionPct =
-        total > 0 ? Math.round((doneCount / total) * 100) : 0;
-
       const ef = epicIssue.fields;
-      const lines = [
-        `## Epic: [${epicKey}] ${ef.summary}`,
-        "",
-        `| Metric | Value |`,
-        `| --- | --- |`,
-        `| Status | ${ef.status.name} |`,
-        `| Priority | ${ef.priority?.name ?? "None"} |`,
-        `| Assignee | ${ef.assignee?.displayName ?? "Unassigned"} |`,
-        `| Total Issues | ${total} |`,
-        `| Completion | **${completionPct}%** (${doneCount}/${total} done) |`,
-        `| Labels | ${ef.labels?.join(", ") || "None"} |`,
-        "",
-        "### Status Breakdown",
-        "",
-        ...Object.entries(byStatus)
-          .sort(([, a], [, b]) => b - a)
-          .map(([status, count]) => `- ${status}: **${count}**`),
-        "",
-        "### Priority Breakdown",
-        "",
-        ...Object.entries(byPriority)
-          .sort(([, a], [, b]) => b - a)
-          .map(([pri, count]) => `- ${pri}: **${count}**`),
-        "",
-        "### Assignee Distribution",
-        "",
-        ...Object.entries(byAssignee)
-          .sort(([, a], [, b]) => b - a)
-          .map(([name, count]) => `- ${name}: **${count}**`),
-        "",
-        "### Child Issues",
-        "",
-        ...issues.map(
-          (i) =>
-            `- **${i.key}** ${i.fields.summary} — *${i.fields.status.name}* (${i.fields.priority?.name ?? "None"}) [${i.fields.assignee?.displayName ?? "Unassigned"}]`
-        ),
-      ];
+      const childIssues = issues.map((i) => ({
+        key: i.key,
+        summary: i.fields.summary,
+        status: i.fields.status.name,
+        priority: i.fields.priority?.name ?? "None",
+        assignee: i.fields.assignee?.displayName ?? "Unassigned",
+      }));
+
+      const text = toonEpicDetail(
+        epicKey,
+        ef.summary,
+        ef.status.name,
+        ef.priority?.name ?? "None",
+        ef.assignee?.displayName ?? "Unassigned",
+        ef.labels?.join(", ") || "None",
+        total,
+        doneCount,
+        byStatus,
+        byPriority,
+        byAssignee,
+        childIssues
+      );
 
       return {
-        content: [{ type: "text" as const, text: lines.join("\n") }],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -202,7 +167,7 @@ export function registerEpicTools(server: McpServer): void {
         content: [
           {
             type: "text" as const,
-            text: `Moved **${issueKeys.length}** issue(s) to epic **${epicKey}**: ${issueKeys.join(", ")}`,
+            text: toonResult("moved", { epicKey, issueKeys, count: issueKeys.length }),
           },
         ],
       };

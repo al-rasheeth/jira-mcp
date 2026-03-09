@@ -175,6 +175,7 @@ For on-premise JIRA with Personal Access Token:
 
 ## Key Features
 
+- **TOON Output**: All tool outputs, resources, and prompt context use TOON (Token-Oriented Object Notation) for ~40–60% token reduction vs JSON/Markdown
 - **ADF-Markdown Bridge**: Bidirectional conversion between JIRA's Atlassian Document Format and Markdown for LLM-friendly interaction
 - **Smart Caching**: LRU cache with per-entity TTL and automatic invalidation on write operations
 - **Custom Field Mapping**: Define friendly names in config, use them in tools transparently

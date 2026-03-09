@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getClient } from "../client/jira-client.js";
 import { getCache } from "../cache/cache.js";
+import { toonVersions, toonComponents } from "../formatter/toon.js";
 import type {
   JiraVersion,
   JiraComponent,
@@ -29,41 +30,9 @@ export function registerVersionAndComponentTools(server: McpServer): void {
 
       const versions = raw.values ?? [];
 
-      if (versions.length === 0) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `No versions in project **${projectKey}**.`,
-            },
-          ],
-        };
-      }
-
-      const lines = [`**${versions.length}** version(s) in **${projectKey}**:`, ""];
-
-      for (const v of versions) {
-        const status = v.released
-          ? "Released"
-          : v.archived
-            ? "Archived"
-            : v.overdue
-              ? "**OVERDUE**"
-              : "Unreleased";
-        const dates = [
-          v.startDate ? `start: ${v.startDate}` : null,
-          v.releaseDate ? `release: ${v.releaseDate}` : null,
-        ]
-          .filter(Boolean)
-          .join(", ");
-
-        lines.push(
-          `- **${v.name}** [${status}]${dates ? ` (${dates})` : ""}${v.description ? ` — ${v.description}` : ""}`
-        );
-      }
-
+      const text = toonVersions(versions, projectKey);
       return {
-        content: [{ type: "text" as const, text: lines.join("\n") }],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
@@ -88,31 +57,9 @@ export function registerVersionAndComponentTools(server: McpServer): void {
 
       const components = raw.values ?? [];
 
-      if (components.length === 0) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `No components in project **${projectKey}**.`,
-            },
-          ],
-        };
-      }
-
-      const text = components
-        .map(
-          (c) =>
-            `- **${c.name}**${c.lead ? ` (Lead: ${c.lead.displayName})` : ""}${c.description ? ` — ${c.description}` : ""}`
-        )
-        .join("\n");
-
+      const text = toonComponents(components, projectKey);
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `**${components.length}** component(s) in **${projectKey}**:\n\n${text}`,
-          },
-        ],
+        content: [{ type: "text" as const, text }],
       };
     }
   );
