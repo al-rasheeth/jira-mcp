@@ -9,6 +9,16 @@ npm install
 npm run build
 ```
 
+### Test client
+
+Run the built-in MCP test client (loads `.env` from the project root) to list and call tools, resources, and prompts:
+
+```bash
+npm run test-client
+```
+
+Create a `.env` with at least `JIRA_BASE_URL` and `JIRA_API_TOKEN` (and `JIRA_EMAIL` for Cloud). Commands: `list-tools`, `list-resources`, `list-prompts`, `call <tool> [<json>]`, `resource [uri]`, `prompt <name> [<json>]`, `quit`.
+
 ## MCP Client Configuration
 
 Add to your MCP client config (Cursor, Claude Desktop, etc.):
