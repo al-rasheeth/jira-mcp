@@ -65,6 +65,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const PROXY_CONNECT_MSG = "Proxy connection ended before receiving CONNECT response";
+
+/**
+ * Wraps HttpsProxyAgent so the destination TLS connection (after CONNECT 200)
+ * also receives rejectUnauthorized: false when using corporate proxies / SSL inspection.
+ */
+function createProxyAgent(proxyUrl: string, insecure: boolean): InstanceType<typeof HttpsProxyAgent> {
+  const base = new HttpsProxyAgent(proxyUrl, {
+    rejectUnauthorized: !insecure,
+  });
+  if (!insecure) return base;
+  const origConnect = base.connect.bind(base);
+  (base as { connect: typeof origConnect }).connect = (req, opts) =>
+    origConnect(req, { ...opts, rejectUnauthorized: false } as Parameters<typeof origConnect>[1]);
+  return base;
+}
+
 interface CacheOpts {
   key: string;
   entity: EntityType;
@@ -103,9 +120,10 @@ export class JiraClient {
     };
 
     if (this.config.proxyUrl) {
-      baseRequestConfig.httpsAgent = new HttpsProxyAgent(this.config.proxyUrl, {
-        rejectUnauthorized: !this.config.insecure,
-      });
+      baseRequestConfig.httpsAgent = createProxyAgent(
+        this.config.proxyUrl,
+        this.config.insecure
+      );
       baseRequestConfig.proxy = false;
     } else if (this.config.insecure) {
       baseRequestConfig.httpsAgent = new https.Agent({
@@ -168,6 +186,7 @@ export class JiraClient {
       } catch (err) {
         const axErr = err as AxiosError;
         const status = axErr?.response?.status;
+        const msg = err instanceof Error ? err.message : String(err);
 
         if (status === 429) {
           const retryAfter = axErr.response?.headers?.["retry-after"];
@@ -184,6 +203,14 @@ export class JiraClient {
           continue;
         }
 
+        if (
+          msg.includes(PROXY_CONNECT_MSG) &&
+          attempt < this.config.maxRetries
+        ) {
+          lastError = err instanceof Error ? err : new Error(msg);
+          continue;
+        }
+
         throw this.wrapError(axErr);
       }
     }
@@ -191,12 +218,13 @@ export class JiraClient {
     throw lastError ?? new Error("Request failed after retries");
   }
 
-  private wrapError(err: AxiosError): JiraApiError | Error {
-    if (!err.response) return err instanceof Error ? err : new Error(String(err));
-    const data = err.response.data as JiraErrorResponse | undefined;
+  private wrapError(err: AxiosError | Error): JiraApiError | Error {
+    const ax = err as AxiosError;
+    if (!ax.response) return err instanceof Error ? err : new Error(String(err));
+    const data = ax.response.data as JiraErrorResponse | undefined;
     return new JiraApiError(
-      err.response.status,
-      err.response.statusText ?? "",
+      ax.response.status,
+      ax.response.statusText ?? "",
       data
     );
   }
