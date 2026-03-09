@@ -1,4 +1,5 @@
 import https from "node:https";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import { Version2Client, Version3Client } from "jira.js";
 import { AgileClient } from "jira.js";
 import type { AxiosError } from "axios";
@@ -64,23 +65,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function parseProxy(proxyUrl: string) {
-  const u = new URL(proxyUrl);
-  return {
-    protocol: u.protocol.replace(":", ""),
-    host: u.hostname,
-    port: parseInt(u.port, 10) || (u.protocol === "https:" ? 443 : 8080),
-    ...(u.username
-      ? {
-          auth: {
-            username: decodeURIComponent(u.username),
-            password: decodeURIComponent(u.password),
-          },
-        }
-      : {}),
-  };
-}
-
 interface CacheOpts {
   key: string;
   entity: EntityType;
@@ -119,10 +103,11 @@ export class JiraClient {
     };
 
     if (this.config.proxyUrl) {
-      baseRequestConfig.proxy = parseProxy(this.config.proxyUrl);
-    }
-
-    if (this.config.insecure) {
+      baseRequestConfig.httpsAgent = new HttpsProxyAgent(this.config.proxyUrl, {
+        rejectUnauthorized: !this.config.insecure,
+      });
+      baseRequestConfig.proxy = false;
+    } else if (this.config.insecure) {
       baseRequestConfig.httpsAgent = new https.Agent({
         rejectUnauthorized: false,
       });

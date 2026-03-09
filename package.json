@@ -26,6 +26,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.0",
     "@toon-format/toon": "^2.1.0",
+    "https-proxy-agent": "^7.0.6",
     "jira.js": "^5.3.1",
     "lru-cache": "^11.0.0",
     "zod": "^3.24.0"
