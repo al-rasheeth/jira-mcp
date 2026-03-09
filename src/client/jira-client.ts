@@ -5,7 +5,14 @@ import { AgileClient } from "jira.js";
 import type { AxiosError } from "axios";
 import { getConfig, type Config } from "../config.js";
 import { getCache, type EntityType } from "../cache/cache.js";
-import type { JiraErrorResponse, JiraIssue, JiraSearchResponse } from "./types.js";
+import type {
+  JiraErrorResponse,
+  JiraIssue,
+  JiraSearchResponse,
+  JiraSprintIssuesResponse,
+  JiraEpicsResponse,
+  JiraBoardsResponse,
+} from "./types.js";
 
 export class JiraApiError extends Error {
   constructor(
@@ -229,10 +236,16 @@ export class JiraClient {
     );
   }
 
+  /** JIRA Cloud search returns at most this many issues per request; we paginate to honour maxResultsLimit. */
+  private static readonly CLOUD_SEARCH_PAGE_SIZE = 100;
+
+  /** Agile/board APIs often cap at 50–100 per request; we paginate with this page size. */
+  private static readonly AGILE_PAGE_SIZE = 100;
+
   /**
    * JQL search using the correct endpoint:
-   * - Cloud: enhanced search (POST /rest/api/3/search/jql) with nextPageToken
-   * - DC: legacy search (POST /rest/api/2/search) with startAt
+   * - Cloud: enhanced search (POST /rest/api/3/search/jql) with nextPageToken; paginates when maxResults > 100.
+   * - DC: legacy search (POST /rest/api/2/search) with startAt.
    */
   private async searchJql(opts: {
     jql: string;
@@ -242,26 +255,46 @@ export class JiraClient {
     startAt?: number;
     expand?: string[];
   }): Promise<JiraSearchResponse> {
+    const requested = opts.maxResults ?? 50;
+
     if (this.isCloud) {
-      const raw = await this.v3.issueSearch.searchForIssuesUsingJqlEnhancedSearchPost({
-        jql: opts.jql,
-        fields: opts.fields,
-        maxResults: opts.maxResults ?? 50,
-        nextPageToken: opts.nextPageToken,
-      });
+      const all: JiraIssue[] = [];
+      let token: string | undefined = opts.nextPageToken;
+      let total = 0;
+
+      while (all.length < requested) {
+        const pageSize = Math.min(
+          requested - all.length,
+          JiraClient.CLOUD_SEARCH_PAGE_SIZE
+        );
+        const raw = await this.v3.issueSearch.searchForIssuesUsingJqlEnhancedSearchPost({
+          jql: opts.jql,
+          fields: opts.fields,
+          maxResults: pageSize,
+          nextPageToken: token,
+        });
+        const page = (raw.issues ?? []) as unknown as JiraIssue[];
+        all.push(...page);
+        token = raw.nextPageToken;
+        if (typeof (raw as { totalCount?: number }).totalCount === "number") {
+          total = (raw as { totalCount: number }).totalCount;
+        }
+        if (page.length === 0 || !token) break;
+      }
+
       return {
-        issues: (raw.issues ?? []) as unknown as JiraIssue[],
-        total: (raw.issues ?? []).length,
-        maxResults: opts.maxResults ?? 50,
+        issues: all,
+        total: total || all.length,
+        maxResults: requested,
         startAt: 0,
-        nextPageToken: raw.nextPageToken,
+        nextPageToken: token,
       };
     }
 
     const raw = await this.v2.issueSearch.searchForIssuesUsingJqlPost({
       jql: opts.jql,
       fields: opts.fields,
-      maxResults: opts.maxResults ?? 50,
+      maxResults: requested,
       startAt: opts.startAt ?? 0,
     });
     return {
@@ -285,6 +318,159 @@ export class JiraClient {
       () => this.searchJql(opts),
       opts.cache
     );
+  }
+
+  /**
+   * Agile: get board issues for sprint with pagination so we can return more than the API's per-request cap.
+   */
+  async getBoardIssuesForSprintPaginated(opts: {
+    boardId: number;
+    sprintId: number;
+    maxResults: number;
+    fields?: string[];
+  }): Promise<JiraSprintIssuesResponse> {
+    const { boardId, sprintId, maxResults, fields } = opts;
+    const pageSize = Math.min(maxResults, JiraClient.AGILE_PAGE_SIZE);
+    const all: JiraIssue[] = [];
+    let startAt = 0;
+    let total = 0;
+
+    while (all.length < maxResults) {
+      const raw = await this.call(() =>
+        this.agile.board.getBoardIssuesForSprint({
+          boardId,
+          sprintId,
+          startAt,
+          maxResults: pageSize,
+          fields: fields ?? ["summary", "status", "priority", "assignee", "issuetype", "labels", "project"],
+        })
+      ) as unknown as JiraSprintIssuesResponse;
+      const issues = raw.issues ?? [];
+      all.push(...issues);
+      total = raw.total ?? all.length;
+      if (issues.length === 0 || all.length >= total || all.length >= maxResults) break;
+      startAt = all.length;
+    }
+
+    return {
+      issues: all.slice(0, maxResults),
+      total,
+      maxResults,
+      startAt: 0,
+    };
+  }
+
+  /**
+   * Agile: get issues for sprint with pagination.
+   */
+  async getSprintIssuesPaginated(opts: {
+    sprintId: number;
+    maxResults: number;
+    fields?: string[];
+  }): Promise<JiraSprintIssuesResponse> {
+    const { sprintId, maxResults, fields } = opts;
+    const pageSize = Math.min(maxResults, JiraClient.AGILE_PAGE_SIZE);
+    const all: JiraIssue[] = [];
+    let startAt = 0;
+    let total = 0;
+
+    while (all.length < maxResults) {
+      const raw = await this.call(() =>
+        this.agile.sprint.getIssuesForSprint({
+          sprintId,
+          startAt,
+          maxResults: pageSize,
+          fields: fields ?? ["summary", "status", "priority", "assignee", "issuetype", "labels", "project"],
+        })
+      ) as unknown as JiraSprintIssuesResponse;
+      const issues = raw.issues ?? [];
+      all.push(...issues);
+      total = raw.total ?? all.length;
+      if (issues.length === 0 || all.length >= total || all.length >= maxResults) break;
+      startAt = all.length;
+    }
+
+    return {
+      issues: all.slice(0, maxResults),
+      total,
+      maxResults,
+      startAt: 0,
+    };
+  }
+
+  /**
+   * Agile: get epics for board with pagination.
+   */
+  async getEpicsPaginated(opts: {
+    boardId: number;
+    maxResults: number;
+    done?: boolean;
+  }): Promise<JiraEpicsResponse> {
+    const { boardId, maxResults, done } = opts;
+    const pageSize = Math.min(maxResults, JiraClient.AGILE_PAGE_SIZE);
+    const all: import("./types.js").JiraEpic[] = [];
+    let startAt = 0;
+
+    while (all.length < maxResults) {
+      const raw = await this.call(() =>
+        this.agile.board.getEpics({
+          boardId,
+          startAt,
+          maxResults: pageSize,
+          done: done !== undefined ? String(done) : undefined,
+        })
+      ) as unknown as JiraEpicsResponse;
+      const values = raw.values ?? [];
+      all.push(...values);
+      if ((raw.isLast ?? false) || values.length === 0 || all.length >= maxResults) break;
+      startAt = all.length;
+    }
+
+    return {
+      values: all.slice(0, maxResults),
+      maxResults,
+      startAt: 0,
+      isLast: true,
+    };
+  }
+
+  /**
+   * Agile: get all boards with pagination.
+   */
+  async getAllBoardsPaginated(opts: {
+    maxResults: number;
+    projectKeyOrId?: string;
+    type?: "scrum" | "kanban" | "simple";
+  }): Promise<JiraBoardsResponse> {
+    const { maxResults, projectKeyOrId, type } = opts;
+    const pageSize = Math.min(maxResults, JiraClient.AGILE_PAGE_SIZE);
+    const all: import("./types.js").JiraBoard[] = [];
+    let startAt = 0;
+    let total = 0;
+
+    while (all.length < maxResults) {
+      const raw = await this.call(() =>
+        this.agile.board.getAllBoards({
+          projectKeyOrId,
+          type,
+          startAt,
+          maxResults: pageSize,
+        })
+      ) as unknown as JiraBoardsResponse;
+      const values = raw.values ?? [];
+      all.push(...values);
+      total = raw.total ?? all.length;
+      if (values.length === 0 || all.length >= maxResults || startAt + values.length >= total) break;
+      startAt = all.length;
+    }
+
+    return {
+      values: all.slice(0, maxResults),
+      maxResults,
+      startAt: 0,
+      total,
+      isLast: true,
+    };
   }
 
   /**

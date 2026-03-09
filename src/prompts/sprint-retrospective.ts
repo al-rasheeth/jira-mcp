@@ -28,14 +28,12 @@ export function registerSprintRetrospectivePrompt(server: McpServer): void {
         () => client.agile.sprint.getSprint({ sprintId })
       ) as unknown as JiraSprint;
 
-      const issuesData = await client.call(
-        () => client.agile.board.getBoardIssuesForSprint({
-          boardId,
-          sprintId,
-          fields: ['summary', 'status', 'priority', 'assignee', 'issuetype', 'labels', 'project', 'resolution', 'created', 'updated'],
-          maxResults: getConfig().maxResultsLimit,
-        })
-      ) as unknown as JiraSprintIssuesResponse;
+      const issuesData = await client.getBoardIssuesForSprintPaginated({
+        boardId,
+        sprintId,
+        maxResults: getConfig().maxResultsLimit,
+        fields: ['summary', 'status', 'priority', 'assignee', 'issuetype', 'labels', 'project', 'resolution', 'created', 'updated'],
+      });
 
       const issues = issuesData.issues;
       const completed: JiraIssue[] = [];

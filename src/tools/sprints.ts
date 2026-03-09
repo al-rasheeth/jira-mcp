@@ -38,11 +38,7 @@ export function registerSprintTools(server: McpServer): void {
       const client = getClient();
       const cache = getCache();
       const data = await client.call(
-        () => client.agile.board.getAllBoards({
-          projectKeyOrId,
-          type,
-          maxResults,
-        }),
+        () => client.getAllBoardsPaginated({ projectKeyOrId, type, maxResults }),
         { key: cache.buildKey("board", "list", type ?? "", projectKeyOrId ?? "", String(maxResults)), entity: "board" }
       ) as unknown as JiraBoardsResponse;
 
@@ -91,10 +87,10 @@ export function registerSprintTools(server: McpServer): void {
       const client = getClient();
       const cache = getCache();
       const data = await client.call(
-        () => client.agile.sprint.getIssuesForSprint({
+        () => client.getSprintIssuesPaginated({
           sprintId,
-          fields: ["summary", "status", "priority", "assignee", "issuetype", "labels", "project"],
           maxResults,
+          fields: ["summary", "status", "priority", "assignee", "issuetype", "labels", "project"],
         }),
         { key: cache.buildKey("sprint", "issues", String(sprintId), String(maxResults)), entity: "sprint" }
       ) as unknown as JiraSprintIssuesResponse;

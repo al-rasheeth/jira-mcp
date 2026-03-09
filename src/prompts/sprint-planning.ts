@@ -27,14 +27,12 @@ export function registerSprintPlanningPrompt(server: McpServer): void {
         () => client.agile.sprint.getSprint({ sprintId })
       ) as unknown as JiraSprint;
 
-      const issuesData = await client.call(
-        () => client.agile.board.getBoardIssuesForSprint({
-          boardId,
-          sprintId,
-          fields: ['summary', 'status', 'priority', 'assignee', 'issuetype', 'labels', 'project'],
-          maxResults: getConfig().maxResultsLimit,
-        })
-      ) as unknown as JiraSprintIssuesResponse;
+      const issuesData = await client.getBoardIssuesForSprintPaginated({
+        boardId,
+        sprintId,
+        maxResults: getConfig().maxResultsLimit,
+        fields: ['summary', 'status', 'priority', 'assignee', 'issuetype', 'labels', 'project'],
+      });
 
       const issues = issuesData.issues.map((i) => ({
         key: i.key,

@@ -33,7 +33,7 @@ export function registerEpicTools(server: McpServer): void {
       const client = getClient();
       const cache = getCache();
       const data = await client.call(
-        () => client.agile.board.getEpics({ boardId, maxResults, done: done !== undefined ? String(done) : undefined }),
+        () => client.getEpicsPaginated({ boardId, maxResults, done }),
         { key: cache.buildKey("epic", "list", String(boardId), String(done ?? ""), String(maxResults)), entity: "epic" }
       ) as unknown as JiraEpicsResponse;
 
