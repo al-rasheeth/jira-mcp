@@ -17,7 +17,19 @@ Run the built-in MCP test client (loads `.env` from the project root) to list an
 npm run test-client
 ```
 
-Create a `.env` with at least `JIRA_BASE_URL` and `JIRA_API_TOKEN` (and `JIRA_EMAIL` for Cloud). Commands: `list-tools`, `list-resources`, `list-prompts`, `call <tool> [<json>]`, `resource [uri]`, `prompt <name> [<json>]`, `quit`.
+Create a `.env` with at least `JIRA_BASE_URL` and `JIRA_API_TOKEN` (and `JIRA_EMAIL` for Cloud).
+
+**Quick test** — list projects to verify the server and credentials:
+
+```
+> call list_projects
+```
+or with a limit:
+```
+> call list_projects {"maxResults":10}
+```
+
+Other commands: `list-tools`, `list-resources`, `list-prompts`, `call <tool> [<json>]`, `resource [uri]`, `prompt <name> [<json>]`, `quit`.
 
 ## MCP Client Configuration
 

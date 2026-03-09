@@ -24,7 +24,7 @@ export function registerIssueTools(server: McpServer): void {
       inputSchema: z.object({
         jql: z.string().describe("JQL query string"),
         maxResults: z
-          .number()
+          .coerce.number()
           .int()
           .min(1)
           .max(100)
@@ -278,7 +278,7 @@ export function registerIssueTools(server: McpServer): void {
       inputSchema: z.object({
         issueKey: z.string().describe("Issue key to delete"),
         deleteSubtasks: z
-          .boolean()
+          .coerce.boolean()
           .default(false)
           .describe("Also delete sub-tasks"),
       }),

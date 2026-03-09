@@ -96,8 +96,8 @@ async function main(): Promise<void> {
           }
           const raw = argsStr ? (JSON.parse(argsStr) as Record<string, unknown>) : {};
           const args = Object.fromEntries(
-            Object.entries(raw).map(([k, v]) => [k, typeof v === "string" ? v : String(v)])
-          ) as { [x: string]: string };
+            Object.entries(raw).map(([k, v]) => [k, typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? v : String(v)])
+          ) as { [x: string]: string | number | boolean };
           const result = await client.callTool({ name, arguments: args });
           console.log("Result:", JSON.stringify(result, null, 2));
           break;

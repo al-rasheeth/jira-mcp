@@ -28,7 +28,7 @@ export function registerSprintTools(server: McpServer): void {
           .enum(["scrum", "kanban", "simple"])
           .optional()
           .describe("Board type filter"),
-        maxResults: z.number().int().min(1).max(100).default(50),
+        maxResults: z.coerce.number().int().min(1).max(100).default(50),
       }),
       annotations: { readOnlyHint: true },
     },
@@ -54,7 +54,7 @@ export function registerSprintTools(server: McpServer): void {
       title: "List Sprints",
       description: "List sprints for a given board.",
       inputSchema: z.object({
-        boardId: z.number().int().describe("Board ID"),
+        boardId: z.coerce.number().int().describe("Board ID"),
         state: z
           .enum(["active", "closed", "future"])
           .optional()
@@ -80,8 +80,8 @@ export function registerSprintTools(server: McpServer): void {
       title: "Get Sprint Issues",
       description: "Get all issues in a specific sprint.",
       inputSchema: z.object({
-        sprintId: z.number().int().describe("Sprint ID"),
-        maxResults: z.number().int().min(1).max(100).default(50),
+        sprintId: z.coerce.number().int().describe("Sprint ID"),
+        maxResults: z.coerce.number().int().min(1).max(100).default(50),
       }),
       annotations: { readOnlyHint: true },
     },

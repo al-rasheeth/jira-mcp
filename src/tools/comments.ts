@@ -23,7 +23,7 @@ export function registerCommentTools(server: McpServer): void {
       description: "Get comments on a JIRA issue.",
       inputSchema: z.object({
         issueKey: z.string().describe("Issue key, e.g. PROJ-123"),
-        maxResults: z.number().int().min(1).max(100).default(20),
+        maxResults: z.coerce.number().int().min(1).max(100).default(20),
       }),
       annotations: { readOnlyHint: true },
     },

@@ -14,7 +14,7 @@ export function registerProjectTools(server: McpServer): void {
       description: "List all accessible JIRA projects.",
       inputSchema: z.object({
         maxResults: z
-          .number()
+          .coerce.number()
           .int()
           .min(1)
           .max(200)

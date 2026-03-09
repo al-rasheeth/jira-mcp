@@ -19,12 +19,12 @@ export function registerEpicTools(server: McpServer): void {
       description:
         "List epics for a board. Returns epic ID, key, name, and done status.",
       inputSchema: z.object({
-        boardId: z.number().int().describe("Board ID"),
+        boardId: z.coerce.number().int().describe("Board ID"),
         done: z
-          .boolean()
+          .coerce.boolean()
           .optional()
           .describe("Filter by done status (true = closed epics)"),
-        maxResults: z.number().int().min(1).max(100).default(50),
+        maxResults: z.coerce.number().int().min(1).max(100).default(50),
       }),
       annotations: { readOnlyHint: true },
     },
@@ -49,7 +49,7 @@ export function registerEpicTools(server: McpServer): void {
       inputSchema: z.object({
         epicKey: z.string().describe("Epic issue key, e.g. PROJ-42"),
         maxResults: z
-          .number()
+          .coerce.number()
           .int()
           .min(1)
           .max(100)
